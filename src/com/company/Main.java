@@ -32,6 +32,10 @@ public class Main {
      */
     private static byte[] rightEncode(BigInteger x) {
         //TODO : everything is signed in java naturally, does this impact my base256?
+
+        //Validity Condition: 0 <= x < 2^2040
+        assert 0 < x.compareTo(new BigInteger(String.valueOf(Math.pow(2, 2040))));
+
         int n = 1;
 
         // 1. let n be the smallest positive int for which 2^8n > x
@@ -45,9 +49,7 @@ public class Main {
         // handles exception where first byte is zero because of java signed numbers
         if ((xBytes[0] == 0) && (xBytes.length > 1)) {
             byte[] temp = new byte[xBytes.length - 1];
-            for (int i = 1; i < xBytes.length; i++) {
-                temp[i - 1] = xBytes[i];
-            }
+            System.arraycopy(xBytes, 1, temp, 0, xBytes.length - 1);
             xBytes = temp;
         }
         // 3. let xBytes = enc8(xi) for i = 1 to n. That is reverse the order of each byte
@@ -71,6 +73,10 @@ public class Main {
      */
     private static byte[] leftEncode(BigInteger x) {
         //TODO : everything is signed in java naturally, does this impact my base256?
+
+        //Validity Condition: 0 <= x < 2^2040
+        assert 0 < x.compareTo(new BigInteger(String.valueOf(Math.pow(2, 2040))));
+
         int n = 1;
 
         // 1. let n be the smallest positive int for which 2^8n > x
@@ -84,9 +90,7 @@ public class Main {
         // handles exception where first byte is zero because of java signed numbers
         if ((xBytes[0] == 0) && (xBytes.length > 1)) {
             byte[] temp = new byte[xBytes.length - 1];
-            for (int i = 1; i < xBytes.length; i++) {
-                temp[i - 1] = xBytes[i];
-            }
+            System.arraycopy(xBytes, 1, temp, 0, xBytes.length - 1);
             xBytes = temp;
         }
         // 3. let xBytes = enc8(xi) for i = 1 to n. That is reverse the order of each byte
