@@ -7,7 +7,11 @@ import java.util.Arrays;
 
 /**
  * Main class of NIST compliant implementation of KMACX0F256
+ * Takes inspiration from majossarinen's C implementation which can be found here
+ * https://github.com/mjosaarinen/tiny_sha3/blob/master/sha3.c
  * @author Xavier Hines
+ * @author Cage Peterson
+ * @author Thomas Brookes
  */
 public class Main {
 
@@ -15,11 +19,16 @@ public class Main {
 	    // 2^8 = 255, 2^16 = 65536, 2^3 = 16777216
 
         byte[] b = rightEncode(BigInteger.valueOf(16777216));
-        byte[] c = leftEncode(BigInteger.valueOf(16777216));
+        byte[] c = leftEncode(BigInteger.valueOf(2));
         byte d = (byte) 255;
+        byte[] e = {0,0};
+
+
         System.out.println("reversed value of byte c: " + reverseBitsByte(d));
         System.out.println("byte array of rightEncode: " + Arrays.toString(b));
         System.out.println("byte array of leftEncode: " + Arrays.toString(c));
+        System.out.println("Concatenation of b and c (b || c): " + Arrays.toString(concat(b,c)));
+        System.out.println("encodeString(\"\"): " + Arrays.toString(encodeString(e)));
         System.out.println("Representation of BigInteger as a byte array: " + Arrays.toString(bigIntToByteArray(16777215)));
 
     }
@@ -103,6 +112,22 @@ public class Main {
     }
 
     /**
+     * Encodes a byte[] that represents a string of bits so that it can be unambiguously
+     * parsed from the beginning of S.
+     * @param S byte oriented string of bits
+     * @return encoded bit string S
+     */
+    private static byte[] encodeString(byte[] S) {
+        if (S == null || S.length == 0) {
+            return leftEncode(BigInteger.ZERO);
+        } else {
+            //If S were not byte oriented then the S.length would need to be made a
+            //multiple of 8 i.e. (S.length << 3)
+            return concat(leftEncode(new BigInteger(String.valueOf(S.length))), S);
+        }
+    }
+
+    /**
      * Apply the NIST bytepad primitive to a byte array X with encoding factor w.
      * @author Paulo Barreto
      * @param X the byte array to bytepad
@@ -164,5 +189,18 @@ public class Main {
             x>>=1;
         }
         return b;
+    }
+
+    /**
+     * Concatenates two byte[] in the order they are given
+     * @param b1 byte[] to be appended onto
+     * @param b2 byte[] to be appended
+     * @return the concatenation of b1 and b2 (b1 || b2)
+     */
+    private static byte[] concat(byte[] b1, byte[] b2) {
+        byte[] z = new byte[b1.length + b2.length];
+        System.arraycopy(b1,0,z,0,b1.length);
+        System.arraycopy(b2,0,z,b1.length,b2.length);
+        return z;
     }
 }
