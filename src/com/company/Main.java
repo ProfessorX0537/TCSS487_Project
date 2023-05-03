@@ -82,14 +82,18 @@ public class Main {
         return (x << y) | (x >>> (64 - y));
     }
 
+    /**
+     * Keccak-f sponge construction and permutations
+     * @param v The complete permutation state array
+     */
     private void sha3Keccakf(byte[] v) {
         long[] bc = new long[5];
-        long[] st = new long[25];
+        long[] state = new long[25];
         long t;
 
         // endianess conversion. this is redundant on little-endian targets
         for (int i = 0, j = 0; i < 25; i++, j += 8) {
-            st[i] = (((long)v[j + 0] & 0xFFL)      ) | (((long)v[j + 1] & 0xFFL) <<  8) |
+            state[i] = (((long)v[j + 0] & 0xFFL)      ) | (((long)v[j + 1] & 0xFFL) <<  8) |
                     (((long)v[j + 2] & 0xFFL) << 16) | (((long)v[j + 3] & 0xFFL) << 24) |
                     (((long)v[j + 4] & 0xFFL) << 32) | (((long)v[j + 5] & 0xFFL) << 40) |
                     (((long)v[j + 6] & 0xFFL) << 48) | (((long)v[j + 7] & 0xFFL) << 56);
@@ -100,39 +104,39 @@ public class Main {
 
             // Theta
             for (int i = 0; i < 5; i++) {
-                bc[i] = st[i] ^ st[i + 5] ^ st[i + 10] ^ st[i + 15] ^ st[i + 20];
+                bc[i] = state[i] ^ state[i + 5] ^ state[i + 10] ^ state[i + 15] ^ state[i + 20];
             }
 
             for (int i = 0; i < 5; i++) {
                 t = bc[(i + 4) % 5] ^ rotLane64(bc[(i + 1) % 5], 1);
                 for (int j = 0; j < 25; j += 5)
-                    st[j + i] ^= t;
+                    state[j + i] ^= t;
             }
 
             // Rho Pi
-            t = st[1];
+            t = state[1];
             for (int i = 0; i < 24; i++) {
                 int j = keccakfPilane[i];
-                bc[0] = st[j];
-                st[j] = rotLane64(t, keccakfRotc[i]);
+                bc[0] = state[j];
+                state[j] = rotLane64(t, keccakfRotc[i]);
                 t = bc[0];
             }
 
             //  Chi
             for (int j = 0; j < 25; j += 5) {
                 for (int i = 0; i < 5; i++)
-                    bc[i] = st[j + i];
+                    bc[i] = state[j + i];
                 for (int i = 0; i < 5; i++)
-                    st[j + i] ^= (~bc[(i + 1) % 5]) & bc[(i + 2) % 5];
+                    state[j + i] ^= (~bc[(i + 1) % 5]) & bc[(i + 2) % 5];
             }
 
             //  Iota
-            st[0] ^= keccakfRndc[r];
+            state[0] ^= keccakfRndc[r];
         }
 
         // endianess conversion. this is redundant on little-endian targets
         for (int i = 0, j = 0; i < 25; i++, j+=8) {
-            t = st[i];
+            t = state[i];
             v[0 + j] = (byte) (t & 0xFF);
             v[1 + j] = (byte) ((t >> 8) & 0xFF);
             v[2 + j] = (byte) ((t >> 16) & 0xFF);
