@@ -207,6 +207,7 @@ public class Main {
     }
 
     private static byte[] SHAKE256(byte[] in, int bitLength) {
+        // This is a change
         byte[] s = {};
         return s;
     }
