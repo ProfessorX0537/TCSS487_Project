@@ -1,9 +1,7 @@
 package com.company;
 
-import java.lang.reflect.Array;
 import java.io.File;
 import java.math.BigInteger;
-import java.util.Arrays;
 import java.util.Scanner;
 
 /**
@@ -212,7 +210,7 @@ public class Main {
      */
     private void cSHAKE256Helper(byte[] N, byte[] S) {
         sha3Init(SHAKE256);
-        byte[] bPad= bytepad(concat(encodeString(N), encodeString(S)), 136);
+        byte[] bPad= bytePad(concat(encodeString(N), encodeString(S)), 136);
         sha3Update(bPad, bPad.length);
     }
 
@@ -250,7 +248,7 @@ public class Main {
      */
     public static byte[] KMACXOF256(byte[] K, byte[] X, int L, byte[] S) {
 
-        byte[] newX = concat(concat(bytepad(encodeString(K),136), X), rightEncode(BigInteger.ZERO));
+        byte[] newX = concat(concat(bytePad(encodeString(K),136), X), rightEncode(BigInteger.ZERO));
         return cSHAKE256(newX, L, "KMAC".getBytes(), S);
     }
 
@@ -364,7 +362,7 @@ public class Main {
      * @param w the encoding factor (the output length must be a multiple of w)
      * @return the byte-padded byte array X with encoding factor w.
      */
-    private static byte[] bytepad(byte[] X, int w) {
+    private static byte[] bytePad(byte[] X, int w) {
         //TODO w may need to become a biginteger
 
         // Validity Conditions: w > 0
