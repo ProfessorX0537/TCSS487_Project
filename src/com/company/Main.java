@@ -1,5 +1,6 @@
 package com.company;
 
+import java.io.File;
 import java.math.BigInteger;
 import java.util.Scanner;
 
@@ -480,16 +481,60 @@ public class Main {
                 """;
         int response = getIntInRange(userIn, menuPrompt, 1, 4);
         if (response == 1) {
-            System.out.println("test 1");
+            plainHash(fileOrInputPrompt(userIn));
         } else if (response == 2) {
-            System.out.println("test 2");
-
+            authTag(fileOrInputPrompt(userIn));
         } else if (response == 3) {
-            System.out.println("test 3");
-
+            encryptFile();
         } else {
-            System.out.println("test 4");
+            decryptCryptogram();
         }
+    }
+
+    private static String fileOrInputPrompt(Scanner userIn) {
+        String menuPrompt = """
+                What format would you like your input:
+                    1) File
+                    2) User inputted string through command line
+                """;
+        int response = getIntInRange(userIn, menuPrompt, 1, 2);
+        if (response == 1) {
+            return "file";
+        } else {
+            return "user input";
+        }
+    }
+
+    private static void plainHash(final String input) {
+        //input will be "file" or "user input"
+        System.out.println("test 1");
+        if (input.equals("file")) { //input from file
+            System.out.println("in file");
+            Scanner userIn = new Scanner(System.in);
+            File inputFile = getUserInputFile(userIn);
+        } else if (input.equals("user input")) { //input from command line
+            System.out.println("in user input");
+        }
+    }
+
+    private static void authTag(final String input) {
+        //input will be "file" or "user input"
+        System.out.println("test 2");
+        if (input.equals("file")) { //input from file
+            System.out.println("in file");
+            Scanner userIn = new Scanner(System.in);
+            File inputFile = getUserInputFile(userIn);
+        } else if (input.equals("user input")) { //input from command line
+            System.out.println("in user input");
+        }
+    }
+
+    private static void encryptFile() {
+        System.out.println("test 3");
+    }
+
+    private static void decryptCryptogram() {
+        System.out.println("test 4");
     }
 
     /**
@@ -503,10 +548,10 @@ public class Main {
      */
     public static int getIntInRange(final Scanner userIn, final String prompt,
                                     final int minMenuInput, final int maxMenuInput) {
-        int input = getInt(userIn, prompt);
+        int input = getUserInputInt(userIn, prompt);
         while (input < minMenuInput || input > maxMenuInput) {
             System.out.print("Input out of range.\nPlease enter a number that corresponds to a menu prompt.\n");
-            input = getInt(userIn, prompt);
+            input = getUserInputInt(userIn, prompt);
         }
         return input;
     }
@@ -517,7 +562,7 @@ public class Main {
      * @param prompt is the prompt that the user is answering.
      * @return the user inputted int.
      */
-    public static int getInt(final Scanner userIn, final String prompt) {
+    public static int getUserInputInt(final Scanner userIn, final String prompt) {
         System.out.println(prompt);
         while (!userIn.hasNextInt()) {
             userIn.next();
@@ -525,6 +570,23 @@ public class Main {
             System.out.println(prompt);
         }
         return userIn.nextInt();
+    }
+
+    public static File getUserInputFile(final Scanner userIn) {
+        File theFile;
+        boolean pathVerify = false;
+        String filePrompt = "Please enter the full path of the file:";
+        do {
+            System.out.println(filePrompt);
+            theFile = new File(userIn.nextLine());
+            if (theFile.exists()) {
+                pathVerify = true;
+            } else {
+                System.out.println("ERROR: File doesnt exist.");
+            }
+        } while (!pathVerify);
+
+        return theFile;
     }
 
     /**
