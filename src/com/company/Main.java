@@ -1,6 +1,7 @@
 package com.company;
 
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 /**
@@ -163,6 +164,93 @@ public class Main {
         this.pt = 0;
     }
 
+    public void sha3Update(byte[] data, int len) {
+        int j = this.pt;
+        for (int i = 0; i < len; i++) {
+            this.emptyState[j++] ^= data[i];
+            if (j >= this.rsiz) {
+                sha3Keccakf(emptyState);
+                j = 0;
+            }
+        }
+        this.pt = j;
+    }
+
+    /**
+     * Switch form absorbing to extensible squeezing.
+     */
+    public void xof(boolean iscSHAKE) {
+
+        if (iscSHAKE) {
+            this.emptyState[this.pt] ^= 0x04; // cSHAKE is 00
+        } else {
+            this.emptyState[this.pt] ^= 0x1F; // SHAKE is 1111
+        }
+        this.emptyState[this.rsiz-1] ^= (byte) 0x80;
+        sha3Keccakf(this.emptyState);
+        this.pt = 0;
+    }
+
+    public void shakeOut(byte[] out, int len) {
+        int j = this.pt;
+        for (int i = 0; i < len; i++) {
+            if (j >= this.rsiz) {
+                sha3Keccakf(this.emptyState);
+                j = 0;
+            }
+            out[i] = this.emptyState[j++];
+        }
+        this.pt = j;
+    }
+
+    /**
+     *
+     * @param N is a function-name bit string
+     * @param S is a customization bit string
+     */
+    private void cSHAKE256Helper(byte[] N, byte[] S) {
+        sha3Init(SHAKE256);
+        byte[] bPad= bytepad(concat(encodeString(N), encodeString(S)), 136);
+        sha3Update(bPad, bPad.length);
+    }
+
+    /**
+     * Function cSHAKE256
+     *
+     * @param X is the main input bit string of any length
+     * @param L is an integer representing the requested output length in bits
+     * @param N is a function-name bit string
+     * @param S is a customization bit string
+     * @return either SHAKE or KECCAK
+     */
+    private static byte[] cSHAKE256(byte[] X, int L, byte[] N, byte[] S) {
+        Main sha = new Main();
+        boolean cSHAKE = false;
+        byte[] result = new byte[L >>> 3];
+        if (N.length != 0 && S.length != 0) { // use cSHAKE
+            sha.cSHAKE256Helper(N, S);
+            cSHAKE = true;
+        }
+        sha.sha3Update(X, X.length);
+        sha.xof(cSHAKE);
+        sha.shakeOut(result, L >>> 3);
+        return result;
+    }
+
+    /**
+     * Function KMACXOF256
+     *
+     * @param K is a key bit string of any length, including zero
+     * @param X is the main input bit string
+     * @param L is an integer representing the requested output length in bits
+     * @param S is an optional customization bit string
+     * @return cSHAKE256
+     */
+    public static byte[] KMACXOF256(byte[] K, byte[] X, int L, byte[] S) {
+
+        byte[] newX = concat(concat(bytepad(encodeString(K),136), X), rightEncode(BigInteger.ZERO));
+        return cSHAKE256(newX, L, "KMAC".getBytes(), S);
+    }
 
     /************************************************************
      *                    Auxiliary Methods                     *
@@ -364,18 +452,18 @@ public class Main {
     public static void main(String[] args) {
         // 2^8 = 255, 2^16 = 65536, 2^3 = 16777216
 
-        byte[] b = rightEncode(BigInteger.valueOf(16777216));
-        byte[] c = leftEncode(BigInteger.valueOf(2));
-        byte d = (byte) 255;
-        byte[] e = {0,0};
-
-
-        System.out.println("reversed value of byte c: " + reverseBitsByte(d));
-        System.out.println("byte array of rightEncode: " + Arrays.toString(b));
-        System.out.println("byte array of leftEncode: " + Arrays.toString(c));
-        System.out.println("Concatenation of b and c (b || c): " + Arrays.toString(concat(b,c)));
-        System.out.println("encodeString(e): " + Arrays.toString(encodeString(e)));
-        System.out.println("Representation of BigInteger as a byte array: " + Arrays.toString(bigIntToByteArray(16777215)));
+//        byte[] b = rightEncode(BigInteger.valueOf(16777216));
+//        byte[] c = leftEncode(BigInteger.valueOf(2));
+//        byte d = (byte) 255;
+//        byte[] e = {0,0};
+//
+//
+//        System.out.println("reversed value of byte c: " + reverseBitsByte(d));
+//        System.out.println("byte array of rightEncode: " + Arrays.toString(b));
+//        System.out.println("byte array of leftEncode: " + Arrays.toString(c));
+//        System.out.println("Concatenation of b and c (b || c): " + Arrays.toString(concat(b,c)));
+//        System.out.println("encodeString(e): " + Arrays.toString(encodeString(e)));
+//        System.out.println("Representation of BigInteger as a byte array: " + Arrays.toString(bigIntToByteArray(16777215)));
 
     }
 
