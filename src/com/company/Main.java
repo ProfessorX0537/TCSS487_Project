@@ -1,8 +1,8 @@
 package com.company;
 
 import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Scanner;
 
 /**
  * Main class of NIST compliant implementation of KMACX0F256
@@ -501,6 +501,29 @@ public class Main {
 //        System.out.println("Concatenation of b and c (b || c): " + Arrays.toString(concat(b,c)));
 //        System.out.println("encodeString(e): " + Arrays.toString(encodeString(e)));
 //        System.out.println("Representation of BigInteger as a byte array: " + Arrays.toString(bigIntToByteArray(16777215)));
+        Scanner userIn = new Scanner(System.in);
+        do {
+            selectService(userIn);
+        } while (repeat(userIn));
+        userIn.close();
+    }
+
+    private static void selectService(final Scanner userIn) {
+        String menuPrompt = """
+                Please enter the corresponding number of the service you would like to use:
+                    1) Compute a plain cryptographic hash from a file
+                    2) Compute an authentication tag (MAC)
+                    3) Encrypt a given data file
+                    4) Decrypt a given symmetric cryptogram
+                """;
+        int response = getIntInRange(userIn, menuPrompt, 1, 4);
+        if (response == 1) {
+            System.out.println("test 1");
+        } else if (response == 2) {
+            System.out.println("test 2");
+
+        } else if (response == 3) {
+            System.out.println("test 3");
 
         String s = "Email Signature";
         String data = "00 01 02 03";
@@ -511,6 +534,60 @@ public class Main {
         System.out.println(Arrays.toString(x));
         System.out.println(bytesToHexString(x));
 
+        } else {
+            System.out.println("test 4");
+        }
+    }
+
+    /**
+     * Checks whether the user inputted integer is within the desired range.
+     * This will keep running until the user inputs an integer that is in the desired range.
+     * @param userIn is the scanner that will be used for user input.
+     * @param prompt is the prompt that the user is answering from.
+     * @param minMenuInput the low end of the options on the menu.
+     * @param maxMenuInput the high end of the options on the menu.
+     * @return the user inputted int that is within the desired range.
+     */
+    public static int getIntInRange(final Scanner userIn, final String prompt,
+                                    final int minMenuInput, final int maxMenuInput) {
+        int input = getInt(userIn, prompt);
+        while (input < minMenuInput || input > maxMenuInput) {
+            System.out.print("Input out of range.\nPlease enter a number that corresponds to a menu prompt.\n");
+            input = getInt(userIn, prompt);
+        }
+        return input;
+    }
+
+    /**
+     * Checks to see whether the user inputted an int or not.
+     * @param userIn is the scanner that will be used for user input.
+     * @param prompt is the prompt that the user is answering.
+     * @return the user inputted int.
+     */
+    public static int getInt(final Scanner userIn, final String prompt) {
+        System.out.println(prompt);
+        while (!userIn.hasNextInt()) {
+            userIn.next();
+            System.out.println("Invalid input. Please enter an integer.");
+            System.out.println(prompt);
+        }
+        return userIn.nextInt();
+    }
+
+    /**
+     * Asks the user if they would like to repeat the program.
+     * Accepted responses:
+     *  Y or Yes (ignoring case)
+     *  N or No (ignoring case)
+     * @param userIn The scanner that will be used.
+     * @return Returns true if the user would like to repeat, false if the user would like to quit.
+     */
+    private static boolean repeat(final Scanner userIn) {
+        System.out.println("\nWould you like to use another service? (Y/N)");
+        String s = userIn.next();
+        System.out.println();
+        return (s.equalsIgnoreCase("Y") || s.equalsIgnoreCase ("yes"));
     }
 
 }
+
