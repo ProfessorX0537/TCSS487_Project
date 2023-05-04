@@ -1,51 +1,15 @@
 package com.company;
 
-import java.lang.reflect.Array;
 import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Scanner;
 
-/**
- * Main class of NIST compliant implementation of KMACX0F256
- * Takes heavy inspiration from majossarinen's C implementation which can be found here
- * https://github.com/mjosaarinen/tiny_sha3/blob/master/sha3.c
- * @author Xavier Hines
- * @author Cage Peterson
- * @author Thomas Brookes
- */
-public class Main {
-    /************************************************************
-     *                Keccak-f Sponge Construction              *
-     ************************************************************/
-
-    /**
-     * byte[] which is the width of the Keccak-f sponge (1600 bits) where each
-     * lane in the sponge is a 64 bit word. There are 25 lanes which makes a
-     *  64 * 5 * 5 three-dimensional matrix which Keccak-f permutations will be
-     *  performed on.
-     */
-    private byte[] emptyState = new byte[200];
-
-    /**
-     * The number of rounds performed in Keccak-f
-     */
-    private final int keccakfRnds = 24;
-
-    /**
-     * Value used to initialize SHA3
-     */
-    private final int SHAKE256 = 32;
-
-    /**
-     * Values used in multiple methods
-     */
-    private int pt, rsiz, mdlen;
-
+public class KMAC {
 
     /**
      * The round constants defined by specification of which there are 24
      */
-    private final long[] keccakfRndc = {
+    private static final long[] keccakfRndc = {
             0x0000000000000001L, 0x0000000000008082L, 0x800000000000808aL,
             0x8000000080008000L, 0x000000000000808bL, 0x0000000080000001L,
             0x8000000080008081L, 0x8000000000008009L, 0x000000000000008aL,
@@ -59,7 +23,7 @@ public class Main {
     /**
      * Rotation offsets for the roh function.
      */
-    private final int[] keccakfRotc = {
+    private static final int[] keccakfRotc = {
             1,  3,  6,  10, 15, 21, 28, 36, 45, 55, 2,  14,
             27, 41, 56, 8,  25, 43, 62, 18, 39, 61, 20, 44
     };
@@ -67,85 +31,161 @@ public class Main {
     /**
      * The position for each word with respect to lane shifts in pi function
      */
-    private  final int[] keccakfPilane = {
+    private static final int[] keccakfPilane = {
             10, 7,  11, 17, 18, 3, 5,  16, 8,  21, 24, 4,
             15, 23, 19, 13, 12, 2, 20, 14, 22, 9,  6,  1
     };
 
+    /************************************************************
+     *                    Keccak Machinery                      *
+     ************************************************************/
+
+
     /**
-     * Will perform some bit rotation on a given lane
-     * @param x lane
-     * @param y amount of rotation
-     * @return the lane rotated
+     * The Keccack-p permutation, ref section 3.3 NIST FIPS 202.
+     * @param stateIn the input state, an array of 25 longs ref FIPS 202 sec. 3.1.2
+     * @return the state after the Keccak-p permutation has been applied
      */
-    private static long rotLane64(long x, int y) {
-        return (x << (y%64)) | (x >>> (64 - (y%64)));
+    private static long[] keccakp(long[] stateIn, int bitLen, int rounds) {
+        long[] stateOut = stateIn;
+        int l = floorLog(bitLen/25);
+        for (int i = 12 + 2*l - rounds; i < 12 + 2*l; i++) {
+            stateOut = iota(chi(rhoPhi(theta(stateOut))), i); // sec 3.3 FIPS 202
+        }
+
+        System.out.println("stateout in keccakp: " + Arrays.toString(stateOut));
+
+        //TODO: stateout has different values between the two
+
+        System.out.println("stateout in bytearray: \n" + Arrays.toString(stateToByteArray(stateOut, rounds)));
+
+
+        return stateOut;
     }
 
     /**
-     * Keccak-f sponge construction and permutations
-     * @param v The complete permutation state array
+     * The theta function, ref section 3.2.1 NIST FIPS 202. xors each state bit
+     * with the parities of two columns in the array.
+     * Adapted from https://github.com/mjosaarinen/tiny_sha3/blob/master/sha3.c
+     * @param stateIn the input state, an array of 25 longs ref FIPS 202 sec. 3.1.2
+     * @return the state after the theta function has been applied (array of longs)
      */
-    private void sha3Keccakf(byte[] v) {
-        long[] bc = new long[5];
-        long[] state = new long[25];
-        long t;
+    private static long[] theta(long[] stateIn) {
+        long[] stateOut = new long[25];
+        long[] C = new long[5];
 
-        // endianess conversion. this is redundant on little-endian targets
-        for (int i = 0, j = 0; i < 25; i++, j += 8) {
-            state[i] = (((long)v[j + 0] & 0xFFL))    | (((long)v[j + 1] & 0xFFL) <<  8) |
-                    (((long)v[j + 2] & 0xFFL) << 16) | (((long)v[j + 3] & 0xFFL) << 24) |
-                    (((long)v[j + 4] & 0xFFL) << 32) | (((long)v[j + 5] & 0xFFL) << 40) |
-                    (((long)v[j + 6] & 0xFFL) << 48) | (((long)v[j + 7] & 0xFFL) << 56);
+        for (int i = 0; i < 5; i++) {
+            C[i] = stateIn[i] ^ stateIn[i + 5] ^ stateIn[i + 10] ^ stateIn[i + 15] ^ stateIn[i + 20];
         }
 
-        // actual iteration
-        for (int r = 0; r < keccakfRnds; r++) {
+        for (int i = 0; i < 5; i++) {
+            long d = C[(i+4) % 5] ^ rotLane64(C[(i+1) % 5], 1);
 
-            // Theta
-            for (int i = 0; i < 5; i++) {
-                bc[i] = state[i] ^ state[i + 5] ^ state[i + 10] ^ state[i + 15] ^ state[i + 20];
+            for (int j = 0; j < 5; j++) {
+                stateOut[i + 5*j] = stateIn[i + 5*j] ^ d;
             }
-
-            for (int i = 0; i < 5; i++) {
-                t = bc[(i + 4) % 5] ^ rotLane64(bc[(i + 1) % 5], 1);
-                for (int j = 0; j < 25; j += 5)
-                    state[j + i] ^= t;
-            }
-
-            // Rho Pi
-            t = state[1];
-            for (int i = 0; i < 24; i++) {
-                int j = keccakfPilane[i];
-                bc[0] = state[j];
-                state[j] = rotLane64(t, keccakfRotc[i]);
-                t = bc[0];
-            }
-
-            //  Chi
-            for (int j = 0; j < 25; j += 5) {
-                for (int i = 0; i < 5; i++)
-                    bc[i] = state[j + i];
-                for (int i = 0; i < 5; i++)
-                    state[j + i] ^= (~bc[(i + 1) % 5]) & bc[(i + 2) % 5];
-            }
-
-            //  Iota
-            state[0] ^= keccakfRndc[r];
         }
 
-        // endianess conversion. this is redundant on little-endian targets
-        for (int i = 0, j = 0; i < 25; i++, j+=8) {
-            t = state[i];
-            v[0 + j] = (byte) (t & 0xFF);
-            v[1 + j] = (byte) ((t >> 8) & 0xFF);
-            v[2 + j] = (byte) ((t >> 16) & 0xFF);
-            v[3 + j] = (byte) ((t >> 24) & 0xFF);
-            v[4 + j] = (byte) ((t >> 32) & 0xFF);
-            v[5 + j] = (byte) ((t >> 40) & 0xFF);
-            v[6 + j] = (byte) ((t >> 48) & 0xFF);
-            v[7 + j] = (byte) ((t >> 56) & 0xFF);
+        return stateOut;
+    }
+
+    /**
+     * The rho and phi function, ref section 3.2.2-3 NIST FIPS 202. Shifts and rearranges words.
+     * Adapted from https://github.com/mjosaarinen/tiny_sha3/blob/master/sha3.c
+     * @param stateIn the input state, an array of 25 longs ref FIPS 202 sec. 3.1.2
+     * @return the state after applying the rho and phi function
+     */
+    private static long[] rhoPhi(long[] stateIn) {
+        long[] stateOut = new long[25];
+        stateOut[0] = stateIn[0]; // first value needs to be copied
+        long t = stateIn[1], temp;
+        int ind;
+        for (int i = 0; i < 24; i++) {
+            ind = keccakfPilane[i];
+            temp = stateIn[ind];
+            stateOut[ind] = rotLane64(t, keccakfRotc[i]);
+            t = temp;
         }
+        return stateOut;
+    }
+
+    /**
+     * The chi function, ref section 3.2.4 NIST FIPS 202. xors each word with
+     * a function of two other words in their row.
+     * @param stateIn the input state, an array of 25 longs ref FIPS 202 sec. 3.1.2
+     * @return the state after applying the chi function
+     */
+    private static long[] chi(long[] stateIn) {
+        long[] stateOut = new long[25];
+        for (int i = 0; i < 5; i++) {
+            for (int j = 0; j < 5; j++) {
+                long tmp = ~stateIn[(i+1) % 5 + 5*j] & stateIn[(i+2) % 5 + 5*j];
+                stateOut[i + 5*j] = stateIn[i + 5*j] ^ tmp;
+            }
+        }
+        return stateOut;
+    }
+
+    /**
+     * Applies the round constant to the word at stateIn[0].
+     * ref. section 3.2.5 NIST FIPS 202.
+     * @param stateIn the input state, an array of 25 longs ref FIPS 202 sec. 3.1.2
+     * @return the state after the round constant has been xored with the first lane (st[0])
+     */
+    private static long[] iota(long[] stateIn, int round) {
+        stateIn[0] ^= keccakfRndc[round];
+        return stateIn;
+    }
+
+    /**
+     * The sponge function, produces an output of length bitLen based on the
+     * keccakp permutation over in.
+     * @param in the input byte array
+     * @param bitLen the length of the desired output
+     * @param cap the capacity see section 4 FIPS 202.
+     * @return a byte array of bitLen bits produced by the keccakp permutations over the input
+     */
+    private static byte[] sponge(byte[] in, int bitLen, int cap) {
+        System.out.println("data in to sponge: " + bytesToHexString(in));
+        int rate = 1600 - cap;
+        byte[] padded = in.length % (rate / 8) == 0 ? in : padTenOne(rate, in); // one bit of padding already appended
+        long[][] states = byteArrayToStates(padded, cap);
+        long[] stcml = new long[25];
+        for (long[] st : states) {
+            stcml = keccakp(xorStates(stcml, st), 1600, 24); // Keccak[c] restricted to bitLen 1600
+        }
+
+        long[] out = {};
+        int offset = 0;
+        do {
+            out = Arrays.copyOf(out, offset + rate / 64);
+            System.arraycopy(stcml, 0, out, offset, rate / 64);
+            offset += rate / 64;
+            stcml = keccakp(stcml, 1600, 24);
+        } while (out.length * 64 < bitLen);
+
+        System.out.println("data out of sponge before cut short: " + bytesToHexString( padded));
+        System.out.println("data out of sponge: " + bytesToHexString( stateToByteArray(out, bitLen)));
+        return stateToByteArray(out, bitLen);
+    }
+
+    /**
+     * Applies the 10*1 padding scheme, ref sec 5.1 FIPS 202, to a byte array. Assumes
+     * padding required is byte wise (number of bits needed is multiple of 8).
+     * @param in the bytes array to pad
+     * @param rate the result will be a positive multiple of rate (in terms of bit length)
+     * @return the padded byte array
+     */
+    private static byte[] padTenOne(int rate, byte[] in) {
+        int bytesToPad = (rate / 8) - in.length % (rate / 8);
+        byte[] padded = new byte[in.length + bytesToPad];
+        for (int i = 0; i < in.length + bytesToPad; i++) {
+            if (i < in.length) padded[i] = in[i];
+            else if (i==in.length + bytesToPad - 1) padded[i] = (byte) 0x80; // does not append any domain prefixs
+            else padded[i] = 0;
+        }
+
+        return padded;
     }
 
     /************************************************************
@@ -153,107 +193,39 @@ public class Main {
      ************************************************************/
 
     /**
-     * Initializes the state array for sha3Keccakf
-     * @param mdlen
+     * Produces a variable length message digest based on the keccak-f perumation
+     * over the user input. Ref. NIST FIPS 202 sec. 6.2
+     * @param in the bytes to compute the digest of
+     * @param bitLen the desired length of the output
+     * @return the message digest extracted from the keccakp based sponge
      */
-    private void sha3Init(int mdlen) {
-        for (int i = 0; i < 200; i++) {
-            this.emptyState[0] = (byte) 0;
-        }
-        this.mdlen = mdlen;
-        this.rsiz = 200 - 2 * mdlen;
-        this.pt = 0;
-    }
-
-    public void sha3Update(byte[]  data, int len) {
-        byte[] z = new byte[len];
-        System.arraycopy(data, 0,z, 0,data.length);
-        System.out.println("length of data: " + data.length + "length " + len);;
-        System.out.println("sha3Update data in: \n" + bytesToHexString(data));
-        System.out.println("sha3Update emptyState Before: \n" + bytesToHexString(emptyState));
-        int j = this.pt;
-        //System.out.println("About to Absorb data:\n" + bytesToHexString(this.emptyState));
-        //System.out.println("Data to be absorbed:\n" + bytesToHexString(data));
-        for (int i = 0; i < len; i++) {
-            //TODO: out of bounds?
-            this.emptyState[j++] ^= z[i];
-            if (j >= this.rsiz) {
-                sha3Keccakf(emptyState);
-                j = 0;
-            }
-        }
-        System.out.println("sha3Update emptyState after: \n" + bytesToHexString(emptyState));
-        this.pt = j;
-    }
-
-    /**
-     * Switch form absorbing to extensible squeezing.
-     */
-    public void xof(boolean iscSHAKE) {
-
-        if (iscSHAKE) {
-            this.emptyState[this.pt] ^= 0x04; // cSHAKE is 00
-        } else {
-            this.emptyState[this.pt] ^= 0x1F; // SHAKE is 1111
-        }
-        this.emptyState[this.rsiz-1] ^= (byte) 0x80;
-        sha3Keccakf(this.emptyState);
-        this.pt = 0;
-    }
-
-    public void shakeOut(byte[] out, int len) {
-        int j = this.pt;
-        for (int i = 0; i < len; i++) {
-            if (j >= this.rsiz) {
-                sha3Keccakf(this.emptyState);
-                j = 0;
-            }
-            out[i] = this.emptyState[j++];
-        }
-        this.pt = j;
-    }
-
-    private static byte[] SHAKE256(byte[] in, int bitLength) {
+    public static byte[] SHAKE256(byte[] in, int bitLen) {
         byte[] uin = Arrays.copyOf(in, in.length + 1);
-        int bytesToPad = 136 - in.length % (136);
-        uin[in.length] =  bytesToPad == 1 ? (byte) 0x9f :0x1f;
-
-
-        byte[] s = {};
-        return s;
+        int bytesToPad = 136 - in.length % (136); // rate is 136 bytes
+        uin[in.length] = bytesToPad == 1 ? (byte) 0x9f : 0x1f; // pad with suffix defined in FIPS 202 sec. 6.2
+        return sponge(uin, bitLen, 512);
     }
-
 
     /**
-     * Function cSHAKE256
-     *
-     * @param in is the main input bit string of any length
-     * @param bitLength is an integer representing the requested output length in bits
-     * @param funcName is a function-name bit string
-     * @param customString is a customization bit string
-     * @return either SHAKE or KECCAK
+     * cSHAKE func ref sec 3.3 NIST SP 800-185
+     * @param in the byte array to hash
+     * @param bitLen the bit length of the desired output
+     * @param funcName the name of the function to use
+     * @param custStr the customization string
+     * @return the message digest based on Keccak[512]
      */
-    private static byte[] cSHAKE256(byte[] in, int bitLength, byte[] funcName, byte[] customString) {
-        Main sha = new Main();
-        if (funcName.length == 0 && customString.length == 0) { // use cSHAKE
-            return SHAKE256(in, bitLength);
-        }
+    public static byte[] cSHAKE256(byte[] in, int bitLen, byte[] funcName, byte[] custStr) {
+        if (funcName.length == 0 && custStr.length == 0) return SHAKE256(in, bitLen);
 
-        byte[] bPad = concat(bytePad(concat(encodeString(funcName),encodeString(customString)), 136),in );
-        bPad = concat(bPad, new byte[]{0x04});
-        byte[] s = {};
-        return s;
+        byte[] fin = concat(encodeString(funcName), encodeString(custStr));
+        fin = concat(bytePad(fin, 136), in);
+        fin = concat(fin, new byte[] {0x04});
 
+        System.out.println("Bytes before sponge: \n" + bytesToHexString(fin));
 
-//        Main sha = new Main();
-//        boolean cSHAKE = false;
-//        byte[] result = new byte[bitLength >>> 3];
-//
-//        sha.sha3Update(in, in.length);
-//        sha.xof(cSHAKE);
-//        sha.shakeOut(result, bitLength >>> 3);
-//        return result;
+        return sponge(fin, bitLen, 512);
     }
+    
 
     /**
      * The Keccak MAC with extensible output
@@ -406,10 +378,104 @@ public class Main {
             z[i] = (byte) 0;
         }
 
+        System.out.println("bytepad data right before return:\n " + bytesToHexString(z));
+
         // 4. return z
         return z;
     }
 
+
+
+
+    /**
+     * Will perform some bit rotation on a given lane
+     * @param x lane
+     * @param y amount of rotation
+     * @return the lane rotated
+     */
+    private static long rotLane64(long x, int y) {
+        return (x << (y%64)) | (x >>> (64 - (y%64)));
+    }
+
+
+    private static int floorLog(int n) {
+        if (n < 0) throw new IllegalArgumentException("Log is undefined for negative numbers.");
+        int exp = -1;
+        while (n > 0) {
+            n = n>>>1;
+            exp++;
+        }
+        return exp;
+    }
+
+    private static long[] xorStates(long[] s1, long[] s2) {
+        long[] out = new long[25];
+        for (int i = 0; i < s1.length; i++) {
+            out[i] = s1[i] ^ s2[i];
+        }
+        return out;
+    }
+
+    /**
+     * Converts an extended state array to an array of bytes of bit length bitLen (equivalent to Trunc_r).
+     * @param state the state to convert to a byte array
+     * @param bitLen the bit length of the desired output
+     * @return a byte array of length bitLen/8 corresponding to bytes of the state: state[0:bitLen/8]
+     */
+    private static byte[] stateToByteArray(long[] state, int bitLen) {
+        if (state.length*64 < bitLen) throw new IllegalArgumentException("State is of insufficient length to produced desired bit length.");
+        byte[] out = new byte[bitLen/8];
+        int wrdInd = 0;
+        while (wrdInd*64 < bitLen) {
+            long word = state[wrdInd++];
+            int fill = wrdInd*64 > bitLen ? (bitLen - (wrdInd - 1) * 64) / 8 : 8;
+            for (int b = 0; b < fill; b++) {
+                byte ubt = (byte) (word>>>(8*b) & 0xFF);
+                out[(wrdInd - 1)*8 + b] = ubt;
+            }
+        }
+
+        return out;
+    }
+
+    /**
+     * Converts a byte array to series of state arrays. Assumes input array is
+     * evenly divisible by the rate (1600-cap)
+     * @param in the input bytes
+     * @param cap the capacity see section 4 FIPS 202.
+     * @return a two dimensional array corresponding to an array of in.length/(1600-cap) state arrays
+     */
+    private static long[][] byteArrayToStates(byte[] in, int cap) {
+        long[][] states = new long[(in.length*8)/(1600-cap)][25];
+        int offset = 0;
+        for (int i = 0; i < states.length; i++) {
+            long[] state = new long[25];
+            for (int j = 0; j < (1600-cap)/64; j++) {
+                long word = bytesToWord(offset, in);
+                state[j] = word;
+                offset += 8;
+            }
+            // remaining (capacity/64) words will be 0, ref alg 8. step 6 FIPS 202
+            states[i] = state;
+        }
+        return states;
+    }
+
+    /**
+     * Converts the bytes from in[l,r] into a 64 bit word (long)
+     * @param offset the position in the array to read the eight bytes from
+     * @param in the byte array to read from
+     * @return a long that is the result of concatenating the eight bytes beginning at offset
+     */
+    private static long bytesToWord(int offset, byte[] in) {
+        if (in.length < offset+8) throw new IllegalArgumentException("Byte range unreachable, index out of range.");
+        // does endianness matter here?
+        long word = 0L;
+        for (int i = 0; i < 8; i++) {
+            word += (((long)in[offset + i]) & 0xff)<<(8*i);
+        }
+        return word;
+    }
 
 
 
@@ -538,15 +604,26 @@ public class Main {
 //        } while (repeat(userIn));
 //        userIn.close();
 
-        String data = "00 01 02 03";
+        String data = "00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F " +
+                "20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F " +
+                "30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D 3E 3F " +
+                "40 41 42 43 44 45 46 47 48 49 4A 4B 4C 4D 4E 4F " +
+                "50 51 52 53 54 55 56 57 58 59 5A 5B 5C 5D 5E 5F " +
+                "60 61 62 63 64 65 66 67 68 69 6A 6B 6C 6D 6E 6F " +
+                "70 71 72 73 74 75 76 77 78 79 7A 7B 7C 7D 7E 7F " +
+                "80 81 82 83 84 85 86 87 88 89 8A 8B 8C 8D 8E 8F " +
+                "90 91 92 93 94 95 96 97 98 99 9A 9B 9C 9D 9E 9F " +
+                "A0 A1 A2 A3 A4 A5 A6 A7 A8 A9 AA AB AC AD AE AF " +
+                "B0 B1 B2 B3 B4 B5 B6 B7 B8 B9 BA BB BC BD BE BF " +
+                "C0 C1 C2 C3 C4 C5 C6 C7";
         String n = "";
         String s = "Email Signature";
 
         //cSHAKE256(data.getBytes(),512, n.getBytes(), s.getBytes());
-        System.out.println(bytesToHexString(encodeString(n.getBytes())));
-        System.out.println(bytesToHexString(encodeString(s.getBytes())));
-        byte[] bPad= bytePad(concat(encodeString(n.getBytes()), encodeString(s.getBytes())), 136);
-        System.out.println("bytepad data:\n" + bytesToHexString(bPad));
+        System.out.println("Encoded n: \n" + bytesToHexString(encodeString(n.getBytes())));
+        System.out.println("Encoded s: \n" + bytesToHexString(encodeString(s.getBytes())));
+//        byte[] bPad= bytePad(concat(encodeString(n.getBytes()), encodeString(s.getBytes())), 136);
+//        System.out.println("bytepad data:\n" + bytesToHexString(bPad));
 
         cSHAKE256(hexStringToBytes(data), 512, n.getBytes(), s.getBytes());
 
@@ -569,8 +646,8 @@ public class Main {
         } else if (response == 3) {
             System.out.println("test 3");
 
-        String s = "Email Signature";
-        String data = "00 01 02 03";
+            String s = "Email Signature";
+            String data = "00 01 02 03";
         } else {
             System.out.println("test 4");
         }
@@ -625,6 +702,4 @@ public class Main {
         System.out.println();
         return (s.equalsIgnoreCase("Y") || s.equalsIgnoreCase ("yes"));
     }
-
 }
-
