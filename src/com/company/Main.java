@@ -1,6 +1,7 @@
 package com.company;
 
 import java.math.BigInteger;
+import java.util.Arrays;
 import java.util.Scanner;
 
 /**
@@ -442,6 +443,43 @@ public class Main {
         return z;
     }
 
+    /**
+     * Converts byte array to Hex representation String
+     * https://mkyong.com/java/java-how-to-convert-bytes-to-hex/
+     * @param b bytes to be converted
+     * @return string representing hex equivalent
+     */
+    private static String bytesToHexString(byte[] b)  {
+        int space = 0;
+        StringBuilder hex = new StringBuilder();
+        for (int i = 0; i < b.length; i++) {
+            if(space == 1) {
+                hex.append(" ");
+                space = 0;
+            }
+            hex.append(String.format("%02X", b[i]));
+            space++;
+        }
+        return hex.toString();
+    }
+
+    /**
+     * Takes a String representation of Hex values and coverts it to a byte array.
+     * https://www.tutorialspoint.com/convert-hex-string-to-byte-array-in-java#:~:text=To%20convert%20hex%20string%20to,length%20of%20the%20byte%20array.
+     * @param s String of hex values
+     * @return byte array
+     */
+    private static byte[] hexStringToBytes(String s) {
+        s = s.replaceAll("\\s", "");
+        byte[] val = new byte[s.length()/2];
+        for (int i = 0; i < val.length; i++) {
+            int index = i * 2;
+            int j = Integer.parseInt(s.substring(index,index + 2), 16);
+            val[i] = (byte) j;
+        }
+        return val;
+    }
+
 
 
     /************************************************************
@@ -468,6 +506,11 @@ public class Main {
             selectService(userIn);
         } while (repeat(userIn));
         userIn.close();
+
+
+        byte[] x = encodeString("".getBytes());
+        System.out.println(Arrays.toString(x));
+        System.out.println(bytesToHexString(x));
     }
 
     private static void selectService(final Scanner userIn) {
@@ -487,6 +530,8 @@ public class Main {
         } else if (response == 3) {
             System.out.println("test 3");
 
+        String s = "Email Signature";
+        String data = "00 01 02 03";
         } else {
             System.out.println("test 4");
         }
