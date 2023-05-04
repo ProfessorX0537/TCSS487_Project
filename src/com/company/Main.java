@@ -506,6 +506,11 @@ public class Main {
             selectService(userIn);
         } while (repeat(userIn));
         userIn.close();
+
+
+        byte[] x = encodeString("".getBytes());
+        System.out.println(Arrays.toString(x));
+        System.out.println(bytesToHexString(x));
     }
 
     private static void selectService(final Scanner userIn) {
@@ -527,13 +532,6 @@ public class Main {
 
         String s = "Email Signature";
         String data = "00 01 02 03";
-
-
-
-        byte[] x = encodeString("".getBytes());
-        System.out.println(Arrays.toString(x));
-        System.out.println(bytesToHexString(x));
-
         } else {
             System.out.println("test 4");
         }
