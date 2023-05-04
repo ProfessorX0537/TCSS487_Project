@@ -1,13 +1,11 @@
 package com.company;
 
 import java.math.BigInteger;
-import java.nio.ByteBuffer;
-import java.security.SecureRandom;
 import java.util.Arrays;
 
 /**
  * Main class of NIST compliant implementation of KMACX0F256
- * Takes inspiration from majossarinen's C implementation which can be found here
+ * Takes heavy inspiration from majossarinen's C implementation which can be found here
  * https://github.com/mjosaarinen/tiny_sha3/blob/master/sha3.c
  * @author Xavier Hines
  * @author Cage Peterson
@@ -24,7 +22,7 @@ public class Main {
      *  64 * 5 * 5 three-dimensional matrix which Keccak-f permutations will be
      *  performed on.
      */
-    private byte[] b = new byte[200];
+    private byte[] emptyState = new byte[200];
 
     /**
      * The number of rounds performed in Keccak-f
@@ -93,7 +91,7 @@ public class Main {
 
         // endianess conversion. this is redundant on little-endian targets
         for (int i = 0, j = 0; i < 25; i++, j += 8) {
-            state[i] = (((long)v[j + 0] & 0xFFL)      ) | (((long)v[j + 1] & 0xFFL) <<  8) |
+            state[i] = (((long)v[j + 0] & 0xFFL))    | (((long)v[j + 1] & 0xFFL) <<  8) |
                     (((long)v[j + 2] & 0xFFL) << 16) | (((long)v[j + 3] & 0xFFL) << 24) |
                     (((long)v[j + 4] & 0xFFL) << 32) | (((long)v[j + 5] & 0xFFL) << 40) |
                     (((long)v[j + 6] & 0xFFL) << 48) | (((long)v[j + 7] & 0xFFL) << 56);
@@ -148,8 +146,22 @@ public class Main {
         }
     }
 
+    /************************************************************
+     *                        KMACXOF256                        *
+     ************************************************************/
 
-
+    /**
+     * Initializes the state array for sha3Keccakf
+     * @param mdlen
+     */
+    private void sha3Init(int mdlen) {
+        for (int i = 0; i < 200; i++) {
+            this.emptyState[0] = (byte) 0;
+        }
+        this.mdlen = mdlen;
+        this.rsiz = 200 - 2 * mdlen;
+        this.pt = 0;
+    }
 
 
     /************************************************************
