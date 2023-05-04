@@ -1,5 +1,6 @@
 package com.company;
 
+import java.lang.reflect.Array;
 import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Scanner;
@@ -166,6 +167,8 @@ public class Main {
 
     public void sha3Update(byte[] data, int len) {
         int j = this.pt;
+        //System.out.println("About to Absorb data:\n" + bytesToHexString(this.emptyState));
+        //System.out.println("Data to be absorbed:\n" + bytesToHexString(data));
         for (int i = 0; i < len; i++) {
             this.emptyState[j++] ^= data[i];
             if (j >= this.rsiz) {
@@ -203,53 +206,57 @@ public class Main {
         this.pt = j;
     }
 
-    /**
-     *
-     * @param N is a function-name bit string
-     * @param S is a customization bit string
-     */
-    private void cSHAKE256Helper(byte[] N, byte[] S) {
-        sha3Init(SHAKE256);
-        byte[] bPad= bytepad(concat(encodeString(N), encodeString(S)), 136);
-        sha3Update(bPad, bPad.length);
+    private static byte[] SHAKE256(byte[] in, int bitLength) {
+        byte[] s = {};
+        return s;
     }
+
 
     /**
      * Function cSHAKE256
      *
-     * @param X is the main input bit string of any length
-     * @param L is an integer representing the requested output length in bits
-     * @param N is a function-name bit string
-     * @param S is a customization bit string
+     * @param in is the main input bit string of any length
+     * @param bitLength is an integer representing the requested output length in bits
+     * @param funcName is a function-name bit string
+     * @param customString is a customization bit string
      * @return either SHAKE or KECCAK
      */
-    private static byte[] cSHAKE256(byte[] X, int L, byte[] N, byte[] S) {
+    private static byte[] cSHAKE256(byte[] in, int bitLength, byte[] funcName, byte[] customString) {
         Main sha = new Main();
-        boolean cSHAKE = false;
-        byte[] result = new byte[L >>> 3];
-        if (N.length != 0 && S.length != 0) { // use cSHAKE
-            sha.cSHAKE256Helper(N, S);
-            cSHAKE = true;
+        if (funcName.length == 0 && customString.length == 0) { // use cSHAKE
+            return SHAKE256(in, bitLength);
         }
-        sha.sha3Update(X, X.length);
-        sha.xof(cSHAKE);
-        sha.shakeOut(result, L >>> 3);
-        return result;
+
+        byte[] bPad = concat(bytePad(concat(encodeString(funcName),encodeString(customString)), 136),in );
+        bPad = concat(bPad, new byte[]{0x04});
+ //       return sha.sha3Update(bPad,bitLength);
+        byte[] s = {};
+        return s;
+
+
+//        Main sha = new Main();
+//        boolean cSHAKE = false;
+//        byte[] result = new byte[bitLength >>> 3];
+//
+//        sha.sha3Update(in, in.length);
+//        sha.xof(cSHAKE);
+//        sha.shakeOut(result, bitLength >>> 3);
+//        return result;
     }
 
     /**
      * Function KMACXOF256
      *
-     * @param K is a key bit string of any length, including zero
-     * @param X is the main input bit string
-     * @param L is an integer representing the requested output length in bits
-     * @param S is an optional customization bit string
+     * @param key is a key bit string of any length, including zero
+     * @param in is the main input bit string
+     * @param bitLength is an integer representing the requested output length in bits
+     * @param customString is an optional customization bit string
      * @return cSHAKE256
      */
-    public static byte[] KMACXOF256(byte[] K, byte[] X, int L, byte[] S) {
+    public static byte[] KMACXOF256(byte[] key, byte[] in, int bitLength, byte[] customString) {
 
-        byte[] newX = concat(concat(bytepad(encodeString(K),136), X), rightEncode(BigInteger.ZERO));
-        return cSHAKE256(newX, L, "KMAC".getBytes(), S);
+        byte[] newX = concat(concat(bytePad(encodeString(key),136), in), rightEncode(BigInteger.ZERO));
+        return cSHAKE256(newX, bitLength, "KMAC".getBytes(), customString);
     }
 
     /************************************************************
@@ -289,12 +296,13 @@ public class Main {
         // so that the lower order bit is at position 0. Then reverse order of bytes
         byte[] output = new byte[xBytes.length + 1];
         for (int i = 0; i < xBytes.length; i++) {
-            xBytes[i] = reverseBitsByte(xBytes[i]);
+            //xBytes[i] = reverseBitsByte(xBytes[i]);
             output[xBytes.length - (i+1)] = xBytes[i];
         }
         // 4. let xBytes.length + 1 = enc8(n). That is appended the reversed byte representation
         // of n to the end of xBytes.
-        output[output.length-1] = reverseBitsByte((byte)n);
+        //output[output.length-1] = reverseBitsByte((byte)n);
+        output[0] =(byte)n;
         return output;
     }
 
@@ -330,12 +338,13 @@ public class Main {
         // so that the lower order bit is at position 0. Then reverse order of bytes
         byte[] output = new byte[xBytes.length + 1];
         for (int i = 0; i < xBytes.length; i++) {
-            xBytes[i] = reverseBitsByte(xBytes[i]);
+            //xBytes[i] = reverseBitsByte(xBytes[i]);
             output[xBytes.length - (i)] = xBytes[i];
         }
         // 4. let xBytes.length + 1 = enc8(n). That is appended the reversed byte representation
         // of n to the end of xBytes.
-        output[0] = reverseBitsByte((byte)n);
+//        output[0] = reverseBitsByte((byte)n);
+        output[0] =(byte)n;
         return output;
     }
 
@@ -351,7 +360,8 @@ public class Main {
         } else {
             //If S were not byte oriented then the S.length would need to be made a
             //multiple of 8 i.e. (S.length << 3)
-            return concat(leftEncode(new BigInteger(String.valueOf(S.length))), S);
+            System.out.println(S.length);
+            return concat(leftEncode(new BigInteger(String.valueOf(S.length << 3))), S);
         }
     }
 
@@ -362,7 +372,7 @@ public class Main {
      * @param w the encoding factor (the output length must be a multiple of w)
      * @return the byte-padded byte array X with encoding factor w.
      */
-    private static byte[] bytepad(byte[] X, int w) {
+    private static byte[] bytePad(byte[] X, int w) {
         //TODO w may need to become a biginteger
 
         // Validity Conditions: w > 0
@@ -451,14 +461,21 @@ public class Main {
      */
     private static String bytesToHexString(byte[] b)  {
         int space = 0;
+        int newline = 0;
         StringBuilder hex = new StringBuilder();
         for (int i = 0; i < b.length; i++) {
             if(space == 1) {
                 hex.append(" ");
                 space = 0;
             }
+            if(newline == 16) {
+                hex.append("\n");
+                newline = 0;
+            }
+
             hex.append(String.format("%02X", b[i]));
             space++;
+            newline++;
         }
         return hex.toString();
     }
@@ -501,16 +518,25 @@ public class Main {
 //        System.out.println("Concatenation of b and c (b || c): " + Arrays.toString(concat(b,c)));
 //        System.out.println("encodeString(e): " + Arrays.toString(encodeString(e)));
 //        System.out.println("Representation of BigInteger as a byte array: " + Arrays.toString(bigIntToByteArray(16777215)));
-        Scanner userIn = new Scanner(System.in);
-        do {
-            selectService(userIn);
-        } while (repeat(userIn));
-        userIn.close();
 
 
-        byte[] x = encodeString("".getBytes());
-        System.out.println(Arrays.toString(x));
-        System.out.println(bytesToHexString(x));
+
+//        Scanner userIn = new Scanner(System.in);
+//        do {
+//            selectService(userIn);
+//        } while (repeat(userIn));
+//        userIn.close();
+
+        String data = "00 01 02 03";
+        String n = "";
+        String s = "Email Signature";
+
+        //cSHAKE256(data.getBytes(),512, n.getBytes(), s.getBytes());
+        System.out.println(bytesToHexString(encodeString(n.getBytes())));
+        System.out.println(bytesToHexString(encodeString(s.getBytes())));
+        byte[] bPad= bytePad(concat(encodeString(n.getBytes()), encodeString(s.getBytes())), 136);
+        System.out.println("bytepad data:\n" + bytesToHexString(bPad));
+
     }
 
     private static void selectService(final Scanner userIn) {
