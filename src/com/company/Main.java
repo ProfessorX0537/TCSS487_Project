@@ -63,7 +63,7 @@ public class Main {
     private static void selectServicePrompt(final Scanner userIn) {
         String menuPrompt = """
                 Please enter the corresponding number of the service you would like to use:
-                    1) Compute a plain cryptographic hash from a file
+                    1) Compute a plain cryptographic hash
                     2) Compute an authentication tag (MAC)
                     3) Encrypt a given data file
                     4) Decrypt a given symmetric cryptogram
@@ -234,6 +234,8 @@ public class Main {
         //System.out.println("Data passed into the encryption:\n" + bytesToHexString(m));
         byte[] rand = new byte[64];
         z.nextBytes(rand);
+
+        //squeeze bits from sponge
         byte[] keka = KMACXOF256(concat(rand, pw.getBytes()), "".getBytes(), 1024, "S".getBytes());
         byte[] ke = new byte[64];
         System.arraycopy(keka,0,ke,0,64);
@@ -255,12 +257,16 @@ public class Main {
      */
     private static byte[] decrypt(byte[] cryptogram, String pw) {
         byte[] rand = new byte[64];
+        //retrieve 512-bit random number contacted to beginning of cryptogram
         System.arraycopy(cryptogram, 0, rand, 0, 64);
 
+        //retrieve the encrypted message
         byte[] in = Arrays.copyOfRange(cryptogram, 64, cryptogram.length - 64);
 
+        //retrieve tag that was appended to cryptogram
         byte[] tag = Arrays.copyOfRange(cryptogram, cryptogram.length - 64, cryptogram.length);
 
+        //squeeze bits from sponge
         byte[] keka = KMACXOF256(concat(rand, pw.getBytes()), "".getBytes(), 1024, "S".getBytes());
         byte[] ke = new byte[64];
         System.arraycopy(keka,0,ke,0,64);
