@@ -541,21 +541,21 @@ public class KMAC {
      */
     public static String bytesToHexString(byte[] b)  {
         int space = 0;
-        int newline = 0;
+//        int newline = 0;
         StringBuilder hex = new StringBuilder();
         for (int i = 0; i < b.length; i++) {
             if(space == 1) {
                 hex.append(" ");
                 space = 0;
             }
-            if(newline == 16) {
-                hex.append("\n");
-                newline = 0;
-            }
+//            if(newline == 16) {
+//                hex.append("\n");
+//                newline = 0;
+//            }
 
             hex.append(String.format("%02X", b[i]));
             space++;
-            newline++;
+//            newline++;
         }
         return hex.toString();
     }
@@ -576,5 +576,9 @@ public class KMAC {
         }
         return val;
     }
+
+//    public static String hextStringToASCII(String s) {
+//        StringBuilder output = new StringBuilder("");
+//    }
 
 }

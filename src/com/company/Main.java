@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.security.SecureRandom;
+import java.util.Arrays;
 import java.util.Scanner;
 
 import static com.company.KMAC.*;
@@ -204,8 +205,8 @@ public class Main {
     private static void decryptService(String input) {
         Scanner userIn = new Scanner(System.in);
         String thePassphrase;
-        byte[] decryptedByteArray;
-        System.out.println("Please enter a passphrase: ");
+        byte[] decryptedByteArray = new byte[0];
+        System.out.println("Please enter a passphrase used to encrypt: ");
         thePassphrase = userIn.nextLine();
         if (input.equals("prev encrypt")) { //input from file
             decryptedByteArray = decrypt(prevEncrypt, thePassphrase);
@@ -230,6 +231,7 @@ public class Main {
      * @return an encrypted version of the given byte array.
      */
     private static byte[] encrypt(byte[] m, String pw) {
+        //System.out.println("Data passed into the encryption:\n" + bytesToHexString(m));
         byte[] rand = new byte[64];
         z.nextBytes(rand);
         byte[] keka = KMACXOF256(concat(rand, pw.getBytes()), "".getBytes(), 1024, "S".getBytes());
@@ -241,8 +243,6 @@ public class Main {
         byte[] c = KMACXOF256(ke, "".getBytes(), (m.length * 8), "SKE".getBytes());
         c =  xorBytes(c, m);
         byte[] t = KMACXOF256(ka, m, 512, "SKA".getBytes());
-
-        System.out.println("tag in encrypt: \n" + bytesToHexString(t));
 
         return concat(concat(rand, c), t);
     }
@@ -257,10 +257,14 @@ public class Main {
         byte[] rand = new byte[64];
         System.arraycopy(cryptogram, 0, rand, 0, 64);
 
+        byte[] in = Arrays.copyOfRange(cryptogram, 64, cryptogram.length - 64);
+
+        byte[] tag = Arrays.copyOfRange(cryptogram, cryptogram.length - 64, cryptogram.length);
+
         byte[] c = new byte[cryptogram.length - 128];
         System.arraycopy(cryptogram, 64, c, 0, cryptogram.length - 128);
 
-        System.out.println("This should match t from encrypt: \n" + bytesToHexString(c));
+
 
         byte[] keka = KMACXOF256(concat(rand, pw.getBytes()), "".getBytes(), 1024, "S".getBytes());
         byte[] ke = new byte[64];
@@ -268,11 +272,19 @@ public class Main {
         byte[] ka = new byte[64];
         System.arraycopy(keka, 64,ka,0,64);
 
-        byte[] m = KMACXOF256(ke, "".getBytes(), (c.length * 8), "SKE".getBytes());
-        m = xorBytes(m, c);
+        byte[] m = KMACXOF256(ke, "".getBytes(), (in.length*  8), "SKE".getBytes());
+        m = xorBytes(m, in);
 
         byte[] tPrime = KMACXOF256(ka, m, 512, "SKA".getBytes());
-        return concat(concat(c, tPrime), m);
+        //System.out.println("This should be t from encrypt: \n" + bytesToHexString(tag));
+        //System.out.println("This should match t from encrypt: \n" + bytesToHexString(tPrime));
+
+        if (Arrays.equals(tag, tPrime)) {
+            return m;
+        }
+        else {
+            throw new IllegalArgumentException("Tags didn't match");
+        }
     }
 
     /**************************************************************
