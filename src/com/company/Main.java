@@ -3,6 +3,7 @@ package com.company;
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.security.SecureRandom;
 import java.util.Scanner;
@@ -208,12 +209,14 @@ public class Main {
         thePassphrase = userIn.nextLine();
         if (input.equals("prev encrypt")) { //input from file
             decryptedByteArray = decrypt(prevEncrypt, thePassphrase);
-            System.out.println(bytesToHexString(decryptedByteArray));
         } else if (input.equals("user input")) { //input from command line
-
-
+            System.out.println("\nPlease input a cryptogram in hex string format in one line (spaces okay, NO NEW LINES!!!!!): \n");
+            String userString = userIn.nextLine();
+            byte[] hexBytes = hexStringToBytes(userString);
+            decryptedByteArray = decrypt(hexBytes, thePassphrase);
         }
-
+        System.out.println("\nDecryption in Hex format:\n" + bytesToHexString(decryptedByteArray));
+        System.out.println("\nDecryption in String format:\n" + new String (decryptedByteArray, StandardCharsets.UTF_8));
     }
 
 //    private static byte[] hashByteArray(byte[] m) { return KMACXOF256("".getBytes(), m, 512, "D".getBytes()); }
