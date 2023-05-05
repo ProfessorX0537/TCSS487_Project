@@ -2,8 +2,15 @@ package com.company;
 
 import java.math.BigInteger;
 import java.util.Arrays;
-import java.util.Scanner;
 
+
+/**
+ * Implementation of KMACXOF256
+ * Inspiration for implementation of keccak sponge taken from NWc0de and mjosaarinen
+ * https://github.com/mjosaarinen/tiny_sha3/blob/master/sha3.c
+ * https://github.com/NWc0de/KeccakUtils/blob/master/src/crypto/keccak/KCrypt.java
+ *
+ */
 public class KMAC {
 
     /**
@@ -37,38 +44,36 @@ public class KMAC {
     };
 
     /************************************************************
-     *                    Keccak Machinery                      *
+     *                    Keccak Permutations                   *
      ************************************************************/
 
 
     /**
-     * The Keccack-p permutation, ref section 3.3 NIST FIPS 202.
-     * @param stateIn the input state, an array of 25 longs ref FIPS 202 sec. 3.1.2
-     * @return the state after the Keccak-p permutation has been applied
+     * The Keccak permutation function
+     * https://github.com/NWc0de/KeccakUtils/blob/master/src/crypto/keccak/KCrypt.java
+     * @param stateIn the input state
+     * @return the state after the Keccak permutations applied
      */
-    private static long[] keccakp(long[] stateIn, int bitLen, int rounds) {
+    private static long[] keccak(long[] stateIn, int bitLen, int rounds) {
         long[] stateOut = stateIn;
         int l = floorLog(bitLen/25);
         for (int i = 12 + 2*l - rounds; i < 12 + 2*l; i++) {
             stateOut = iota(chi(rhoPhi(theta(stateOut))), i); // sec 3.3 FIPS 202
         }
 
-        System.out.println("stateout in keccakp: " + Arrays.toString(stateOut));
+        //System.out.println("stateout in keccakp: " + Arrays.toString(stateOut));
 
-        //TODO: stateout has different values between the two
-
-        System.out.println("stateout in bytearray: \n" + Arrays.toString(stateToByteArray(stateOut, rounds)));
+        //System.out.println("stateout in bytearray: \n" + Arrays.toString(stateToByteArray(stateOut, rounds)));
 
 
         return stateOut;
     }
 
     /**
-     * The theta function, ref section 3.2.1 NIST FIPS 202. xors each state bit
-     * with the parities of two columns in the array.
+     * https://github.com/NWc0de/KeccakUtils/blob/master/src/crypto/keccak/KCrypt.java
      * Adapted from https://github.com/mjosaarinen/tiny_sha3/blob/master/sha3.c
-     * @param stateIn the input state, an array of 25 longs ref FIPS 202 sec. 3.1.2
-     * @return the state after the theta function has been applied (array of longs)
+     * @param stateIn the input state
+     * @return long[] the state after the theta function has been applied
      */
     private static long[] theta(long[] stateIn) {
         long[] stateOut = new long[25];
@@ -91,6 +96,7 @@ public class KMAC {
 
     /**
      * The rho and phi function, ref section 3.2.2-3 NIST FIPS 202. Shifts and rearranges words.
+     * https://github.com/NWc0de/KeccakUtils/blob/master/src/crypto/keccak/KCrypt.java
      * Adapted from https://github.com/mjosaarinen/tiny_sha3/blob/master/sha3.c
      * @param stateIn the input state, an array of 25 longs ref FIPS 202 sec. 3.1.2
      * @return the state after applying the rho and phi function
@@ -112,6 +118,7 @@ public class KMAC {
     /**
      * The chi function, ref section 3.2.4 NIST FIPS 202. xors each word with
      * a function of two other words in their row.
+     * https://github.com/NWc0de/KeccakUtils/blob/master/src/crypto/keccak/KCrypt.java
      * @param stateIn the input state, an array of 25 longs ref FIPS 202 sec. 3.1.2
      * @return the state after applying the chi function
      */
@@ -129,6 +136,7 @@ public class KMAC {
     /**
      * Applies the round constant to the word at stateIn[0].
      * ref. section 3.2.5 NIST FIPS 202.
+     * https://github.com/NWc0de/KeccakUtils/blob/master/src/crypto/keccak/KCrypt.java
      * @param stateIn the input state, an array of 25 longs ref FIPS 202 sec. 3.1.2
      * @return the state after the round constant has been xored with the first lane (st[0])
      */
@@ -140,19 +148,21 @@ public class KMAC {
     /**
      * The sponge function, produces an output of length bitLen based on the
      * keccakp permutation over in.
+     * https://github.com/NWc0de/KeccakUtils/blob/master/src/crypto/keccak/KCrypt.java
      * @param in the input byte array
      * @param bitLen the length of the desired output
      * @param cap the capacity see section 4 FIPS 202.
      * @return a byte array of bitLen bits produced by the keccakp permutations over the input
      */
     private static byte[] sponge(byte[] in, int bitLen, int cap) {
-        System.out.println("data in to sponge: " + bytesToHexString(in));
+        //System.out.println("data in to sponge: \n" + bytesToHexString(in));
         int rate = 1600 - cap;
         byte[] padded = in.length % (rate / 8) == 0 ? in : padTenOne(rate, in); // one bit of padding already appended
+        //System.out.println("data in sponge padded: \n" + bytesToHexString( padded));
         long[][] states = byteArrayToStates(padded, cap);
         long[] stcml = new long[25];
         for (long[] st : states) {
-            stcml = keccakp(xorStates(stcml, st), 1600, 24); // Keccak[c] restricted to bitLen 1600
+            stcml = keccak(xorStates(stcml, st), 1600, 24); // Keccak[c] restricted to bitLen 1600
         }
 
         long[] out = {};
@@ -161,17 +171,18 @@ public class KMAC {
             out = Arrays.copyOf(out, offset + rate / 64);
             System.arraycopy(stcml, 0, out, offset, rate / 64);
             offset += rate / 64;
-            stcml = keccakp(stcml, 1600, 24);
+            stcml = keccak(stcml, 1600, 24);
         } while (out.length * 64 < bitLen);
 
-        System.out.println("data out of sponge before cut short: " + bytesToHexString( padded));
-        System.out.println("data out of sponge: " + bytesToHexString( stateToByteArray(out, bitLen)));
+
+        //System.out.println("data out of sponge: \n" + bytesToHexString( stateToByteArray(out, bitLen)));
         return stateToByteArray(out, bitLen);
     }
 
     /**
      * Applies the 10*1 padding scheme, ref sec 5.1 FIPS 202, to a byte array. Assumes
      * padding required is byte wise (number of bits needed is multiple of 8).
+     * https://github.com/NWc0de/KeccakUtils/blob/master/src/crypto/keccak/KCrypt.java
      * @param in the bytes array to pad
      * @param rate the result will be a positive multiple of rate (in terms of bit length)
      * @return the padded byte array
@@ -209,21 +220,30 @@ public class KMAC {
     /**
      * cSHAKE func ref sec 3.3 NIST SP 800-185
      * @param in the byte array to hash
-     * @param bitLen the bit length of the desired output
-     * @param funcName the name of the function to use
-     * @param custStr the customization string
+     * @param bitLength the bit length of the desired output
+     * @param functionName the name of the function to use
+     * @param customStr the customization string
      * @return the message digest based on Keccak[512]
      */
-    public static byte[] cSHAKE256(byte[] in, int bitLen, byte[] funcName, byte[] custStr) {
-        if (funcName.length == 0 && custStr.length == 0) return SHAKE256(in, bitLen);
+    public static byte[] cSHAKE256(byte[] in, int bitLength, byte[] functionName, byte[] customStr) {
+//        System.out.println("Encoded n: \n" + bytesToHexString(encodeString(functionName)));
+//        System.out.println("Encoded s: \n" + bytesToHexString(encodeString(customStr)));
+//        System.out.println("Byte[] into cSHAKE256: \n" + bytesToHexString(in));
+//        System.out.println("Bitlength into cSHAKE256: " + bitLength);
+//        System.out.println("functionName into cSHAKE256: \n" + bytesToHexString(functionName));
+//        System.out.println("customString into cSHAKE256: \n" + bytesToHexString(customStr));
+        if (functionName.length == 0 && customStr.length == 0) return SHAKE256(in, bitLength);
 
-        byte[] fin = concat(encodeString(funcName), encodeString(custStr));
+        byte[] fin = concat(encodeString(functionName), encodeString(customStr));
+//        System.out.println("Concatenation of encoded functionName and encoded customStr:\n" + bytesToHexString(fin));
+//        System.out.println("bytePad of previous bytes with 136:\n" + bytesToHexString(bytePad(fin,136)));
         fin = concat(bytePad(fin, 136), in);
+//        System.out.println("Concatenation of bytePad and in:\n" + bytesToHexString(fin));
         fin = concat(fin, new byte[] {0x04});
 
-        System.out.println("Bytes before sponge: \n" + bytesToHexString(fin));
+//        System.out.println("Bytes before sponge: \n" + bytesToHexString(fin));
 
-        return sponge(fin, bitLen, 512);
+        return sponge(fin, bitLength, 512);
     }
     
 
@@ -265,7 +285,7 @@ public class KMAC {
         while (x.compareTo(new BigInteger(String.valueOf((int)Math.pow(2, (8*n))))) != -1) {
             n++;
         }
-        System.out.println("value of n in right encode: " + n);
+        //System.out.println("value of n in right encode: " + n);
         // 2. Let x1, x2, ..., xn be the base-256 encoding of x. That is to say that the byte
         // representation of x
         byte[] xBytes = x.toByteArray();
@@ -307,7 +327,7 @@ public class KMAC {
         while (x.compareTo(new BigInteger(String.valueOf((int)Math.pow(2, (8*n))))) != -1) {
             n++;
         }
-        System.out.println("value of n in left encode: " + n);
+        //System.out.println("value of n in left encode: " + n);
         // 2. Let x1, x2, ..., xn be the base-256 encoding of x. That is to say that the byte
         // representation of x
         byte[] xBytes = x.toByteArray();
@@ -343,7 +363,7 @@ public class KMAC {
         } else {
             //If S were not byte oriented then the S.length would need to be made a
             //multiple of 8 i.e. (S.length << 3)
-            System.out.println(S.length);
+            //System.out.println(S.length);
             return concat(leftEncode(new BigInteger(String.valueOf(S.length << 3))), S);
         }
     }
@@ -378,7 +398,7 @@ public class KMAC {
             z[i] = (byte) 0;
         }
 
-        System.out.println("bytepad data right before return:\n " + bytesToHexString(z));
+//        System.out.println("bytePad returned at end of bytePad function:\n" + bytesToHexString(z));
 
         // 4. return z
         return z;
@@ -398,6 +418,11 @@ public class KMAC {
     }
 
 
+    /**
+     * find the max modulo 2 exponent possible in n
+     * @param n
+     * @return
+     */
     private static int floorLog(int n) {
         if (n < 0) throw new IllegalArgumentException("Log is undefined for negative numbers.");
         int exp = -1;
@@ -408,6 +433,12 @@ public class KMAC {
         return exp;
     }
 
+    /**
+     * will xor the given long array with another given long array
+     * @param s1 long array
+     * @param s2 long array
+     * @return the xor of s1 and s2
+     */
     private static long[] xorStates(long[] s1, long[] s2) {
         long[] out = new long[25];
         for (int i = 0; i < s1.length; i++) {
@@ -477,44 +508,16 @@ public class KMAC {
         return word;
     }
 
-
-
-
-
-
-
     /************************************************************
      *                      Helper Methods                      *
      ************************************************************/
 
-
-    /**
-     * For debugging purposes. Accepts and int and coverts it to a BigInteger then uses
-     * method available to BigInt to covert it to a byte[].
-     * @param i an integer.
-     * @return byte[] of BigInteger representation of i
-     */
-    private static byte[] bigIntToByteArray( final int i ) {
-        BigInteger bigInt = BigInteger.valueOf(i);
-        return bigInt.toByteArray();
-    }
-
-    /**
-     * code to reverse bits in a byte come from.
-     * Author: Tom and Khalil M
-     * Date: 30/7/2017
-     * Location: https://stackoverflow.com/questions/3165776/reverse-bits-in-number
-     * @param x byte
-     * @return the byte in reversed order.
-     */
-    private static byte reverseBitsByte(byte x) {
-        byte b = 0;
-        for (int i = 0; i < 8; ++i) {
-            b<<=1;
-            b|=( x &1);
-            x>>=1;
+    public static byte[] xorBytes(byte[] b1, byte[] b2) {
+        byte[] out = new byte[b1.length];
+        for (int i = 0; i < b1.length; i++) {
+            out[i] = (byte) (b1[i] ^ b2[i]);
         }
-        return b;
+        return out;
     }
 
     /**
@@ -523,7 +526,7 @@ public class KMAC {
      * @param b2 byte[] to be appended
      * @return the concatenation of b1 and b2 (b1 || b2)
      */
-    private static byte[] concat(byte[] b1, byte[] b2) {
+    public static byte[] concat(byte[] b1, byte[] b2) {
         byte[] z = new byte[b1.length + b2.length];
         System.arraycopy(b1,0,z,0,b1.length);
         System.arraycopy(b2,0,z,b1.length,b2.length);
@@ -536,23 +539,23 @@ public class KMAC {
      * @param b bytes to be converted
      * @return string representing hex equivalent
      */
-    private static String bytesToHexString(byte[] b)  {
+    public static String bytesToHexString(byte[] b)  {
         int space = 0;
-        int newline = 0;
+//        int newline = 0;
         StringBuilder hex = new StringBuilder();
         for (int i = 0; i < b.length; i++) {
             if(space == 1) {
                 hex.append(" ");
                 space = 0;
             }
-            if(newline == 16) {
-                hex.append("\n");
-                newline = 0;
-            }
+//            if(newline == 16) {
+//                hex.append("\n");
+//                newline = 0;
+//            }
 
             hex.append(String.format("%02X", b[i]));
             space++;
-            newline++;
+//            newline++;
         }
         return hex.toString();
     }
@@ -563,7 +566,7 @@ public class KMAC {
      * @param s String of hex values
      * @return byte array
      */
-    private static byte[] hexStringToBytes(String s) {
+    public static byte[] hexStringToBytes(String s) {
         s = s.replaceAll("\\s", "");
         byte[] val = new byte[s.length()/2];
         for (int i = 0; i < val.length; i++) {
@@ -574,132 +577,8 @@ public class KMAC {
         return val;
     }
 
+//    public static String hextStringToASCII(String s) {
+//        StringBuilder output = new StringBuilder("");
+//    }
 
-
-    /************************************************************
-     *                          Driver                          *
-     ************************************************************/
-
-    public static void main(String[] args) {
-        // 2^8 = 255, 2^16 = 65536, 2^3 = 16777216
-
-//        byte[] b = rightEncode(BigInteger.valueOf(16777216));
-//        byte[] c = leftEncode(BigInteger.valueOf(2));
-//        byte d = (byte) 255;
-//        byte[] e = {0,0};
-//
-//
-//        System.out.println("reversed value of byte c: " + reverseBitsByte(d));
-//        System.out.println("byte array of rightEncode: " + Arrays.toString(b));
-//        System.out.println("byte array of leftEncode: " + Arrays.toString(c));
-//        System.out.println("Concatenation of b and c (b || c): " + Arrays.toString(concat(b,c)));
-//        System.out.println("encodeString(e): " + Arrays.toString(encodeString(e)));
-//        System.out.println("Representation of BigInteger as a byte array: " + Arrays.toString(bigIntToByteArray(16777215)));
-
-
-
-//        Scanner userIn = new Scanner(System.in);
-//        do {
-//            selectService(userIn);
-//        } while (repeat(userIn));
-//        userIn.close();
-
-        String data = "00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F " +
-                "20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F " +
-                "30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D 3E 3F " +
-                "40 41 42 43 44 45 46 47 48 49 4A 4B 4C 4D 4E 4F " +
-                "50 51 52 53 54 55 56 57 58 59 5A 5B 5C 5D 5E 5F " +
-                "60 61 62 63 64 65 66 67 68 69 6A 6B 6C 6D 6E 6F " +
-                "70 71 72 73 74 75 76 77 78 79 7A 7B 7C 7D 7E 7F " +
-                "80 81 82 83 84 85 86 87 88 89 8A 8B 8C 8D 8E 8F " +
-                "90 91 92 93 94 95 96 97 98 99 9A 9B 9C 9D 9E 9F " +
-                "A0 A1 A2 A3 A4 A5 A6 A7 A8 A9 AA AB AC AD AE AF " +
-                "B0 B1 B2 B3 B4 B5 B6 B7 B8 B9 BA BB BC BD BE BF " +
-                "C0 C1 C2 C3 C4 C5 C6 C7";
-        String n = "";
-        String s = "Email Signature";
-
-        //cSHAKE256(data.getBytes(),512, n.getBytes(), s.getBytes());
-        System.out.println("Encoded n: \n" + bytesToHexString(encodeString(n.getBytes())));
-        System.out.println("Encoded s: \n" + bytesToHexString(encodeString(s.getBytes())));
-//        byte[] bPad= bytePad(concat(encodeString(n.getBytes()), encodeString(s.getBytes())), 136);
-//        System.out.println("bytepad data:\n" + bytesToHexString(bPad));
-
-        cSHAKE256(hexStringToBytes(data), 512, n.getBytes(), s.getBytes());
-
-    }
-
-    private static void selectService(final Scanner userIn) {
-        String menuPrompt = """
-                Please enter the corresponding number of the service you would like to use:
-                    1) Compute a plain cryptographic hash from a file
-                    2) Compute an authentication tag (MAC)
-                    3) Encrypt a given data file
-                    4) Decrypt a given symmetric cryptogram
-                """;
-        int response = getIntInRange(userIn, menuPrompt, 1, 4);
-        if (response == 1) {
-            System.out.println("test 1");
-        } else if (response == 2) {
-            System.out.println("test 2");
-
-        } else if (response == 3) {
-            System.out.println("test 3");
-
-            String s = "Email Signature";
-            String data = "00 01 02 03";
-        } else {
-            System.out.println("test 4");
-        }
-    }
-
-    /**
-     * Checks whether the user inputted integer is within the desired range.
-     * This will keep running until the user inputs an integer that is in the desired range.
-     * @param userIn is the scanner that will be used for user input.
-     * @param prompt is the prompt that the user is answering from.
-     * @param minMenuInput the low end of the options on the menu.
-     * @param maxMenuInput the high end of the options on the menu.
-     * @return the user inputted int that is within the desired range.
-     */
-    public static int getIntInRange(final Scanner userIn, final String prompt,
-                                    final int minMenuInput, final int maxMenuInput) {
-        int input = getInt(userIn, prompt);
-        while (input < minMenuInput || input > maxMenuInput) {
-            System.out.print("Input out of range.\nPlease enter a number that corresponds to a menu prompt.\n");
-            input = getInt(userIn, prompt);
-        }
-        return input;
-    }
-
-    /**
-     * Checks to see whether the user inputted an int or not.
-     * @param userIn is the scanner that will be used for user input.
-     * @param prompt is the prompt that the user is answering.
-     * @return the user inputted int.
-     */
-    public static int getInt(final Scanner userIn, final String prompt) {
-        System.out.println(prompt);
-        while (!userIn.hasNextInt()) {
-            userIn.next();
-            System.out.println("Invalid input. Please enter an integer.");
-            System.out.println(prompt);
-        }
-        return userIn.nextInt();
-    }
-
-    /**
-     * Asks the user if they would like to repeat the program.
-     * Accepted responses:
-     *  Y or Yes (ignoring case)
-     *  N or No (ignoring case)
-     * @param userIn The scanner that will be used.
-     * @return Returns true if the user would like to repeat, false if the user would like to quit.
-     */
-    private static boolean repeat(final Scanner userIn) {
-        System.out.println("\nWould you like to use another service? (Y/N)");
-        String s = userIn.next();
-        System.out.println();
-        return (s.equalsIgnoreCase("Y") || s.equalsIgnoreCase ("yes"));
-    }
 }
