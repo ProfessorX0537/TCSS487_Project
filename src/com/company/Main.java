@@ -261,11 +261,6 @@ public class Main {
 
         byte[] tag = Arrays.copyOfRange(cryptogram, cryptogram.length - 64, cryptogram.length);
 
-        byte[] c = new byte[cryptogram.length - 128];
-        System.arraycopy(cryptogram, 64, c, 0, cryptogram.length - 128);
-
-
-
         byte[] keka = KMACXOF256(concat(rand, pw.getBytes()), "".getBytes(), 1024, "S".getBytes());
         byte[] ke = new byte[64];
         System.arraycopy(keka,0,ke,0,64);
