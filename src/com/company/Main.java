@@ -532,11 +532,11 @@ public class Main {
 
 
 
-//        Scanner userIn = new Scanner(System.in);
-//        do {
-//            selectService(userIn);
-//        } while (repeat(userIn));
-//        userIn.close();
+        Scanner userIn = new Scanner(System.in);
+        do {
+            selectServicePrompt(userIn);
+        } while (repeat(userIn));
+        userIn.close();
 
         String data = "00 01 02 03";
         String n = "";
@@ -552,7 +552,11 @@ public class Main {
 
     }
 
-    private static void selectService(final Scanner userIn) {
+    /*************************************************************
+     *                          Prompts                          *
+     *************************************************************/
+
+    private static void selectServicePrompt(final Scanner userIn) {
         String menuPrompt = """
                 Please enter the corresponding number of the service you would like to use:
                     1) Compute a plain cryptographic hash from a file
@@ -575,6 +579,204 @@ public class Main {
             System.out.println("test 4");
         }
     }
+
+    private static String fileOrInputPrompt(Scanner userIn) {
+        String menuPrompt = """
+                What format would you like your input:
+                    1) File
+                    2) User inputted string through command line
+                """;
+        int response = getIntInRange(userIn, menuPrompt, 1, 2);
+        if (response == 1) {
+            return "file";
+        } else {
+            return "user input";
+        }
+    }
+
+    private static String decryptPreviousEncryptOrGivenCryptogram(Scanner userIn) {
+        String menuPrompt = """
+                What format would you like your input:
+                    1) Most recently encrypted (requires use of encryption service first).
+                    2) User inputted cryptogram
+                """;
+        int response = getIntInRange(userIn, menuPrompt, 1, 2);
+        if (response == 1) {
+            return "prev encrypt";
+        } else {
+            return "user input";
+        }
+    }
+
+    /**
+     * Asks the user if they would like to repeat the program.
+     * Accepted responses:
+     *  Y or Yes (ignoring case)
+     *  N or No (ignoring case)
+     * @param userIn The scanner that will be used.
+     * @return Returns true if the user would like to repeat, false if the user would like to quit.
+     */
+    private static boolean repeat(final Scanner userIn) {
+        System.out.println("\nWould you like to use another service? (Y/N)");
+        String s = userIn.next();
+        System.out.println();
+        return (s.equalsIgnoreCase("Y") || s.equalsIgnoreCase ("yes"));
+    }
+
+    /**************************************************************
+     *                          Services                          *
+     **************************************************************/
+
+    /**
+     * Driver method for the plain hash service.
+     * Prints out a plain cryptographic hash for the given input using KMACXOF256.
+     * The user can choose between a file or command line for input.
+     * @param input the input method, "file" for file input and "user input" for command line input.
+     */
+    private static void plainHashService(final String input) {
+        //input will be "file" or "user input"
+        byte[] byteArray;
+        String theString = null;
+        Scanner userIn = new Scanner(System.in);
+
+        if (input.equals("file")) { //input from file
+            File inputFile = getUserInputFile(userIn);
+            theString = fileToString(inputFile);
+        } else if (input.equals("user input")) { //input from command line
+            System.out.println("Please enter a phrase to be hashed: ");
+            theString = userIn.nextLine();
+        }
+
+        assert theString != null;
+        byteArray = theString.getBytes();
+        byteArray = KMACXOF256("".getBytes(), byteArray, 512, "D".getBytes());
+        System.out.println(bytesToHexString(byteArray));
+    }
+
+    /**
+     * Driver method for the authentication tag service.
+     * Prints out an authentication tag (MAC) for the given input under a given passphrase using KMACXOF256.
+     * The user can choose between a file or command line for input.
+     * @param input the input method, "file" for file input and "user input" for command line input.
+     */
+    private static void authTagService(final String input) {
+        //input will be "file" or "user input"
+        byte[] byteArray;
+        String thePhrase = null;
+        String thePassphrase = null;
+        Scanner userIn = new Scanner(System.in);
+
+        if (input.equals("file")) { //input from file
+            File inputFile = getUserInputFile(userIn);
+            thePhrase = fileToString(inputFile);
+        } else if (input.equals("user input")) { //input from command line
+            System.out.println("Please enter a phrase to be hashed: ");
+            thePhrase = userIn.nextLine();
+        }
+
+        System.out.println("Please enter a passphrase: ");
+        thePassphrase = userIn.nextLine();
+        assert thePhrase != null;
+        byteArray = thePhrase.getBytes();
+        byteArray = KMACXOF256(thePassphrase.getBytes(), byteArray, 512, "T".getBytes());
+        System.out.println(bytesToHexString(byteArray));
+    }
+
+    /**
+     * Driver method for the encryption service.
+     * Prints out an encrypted version for the given input file under a given passphrase.
+     */
+    private static void encryptService() {
+        Scanner userIn = new Scanner(System.in);
+        File theFile = getUserInputFile(userIn);
+        String theFileContent = fileToString(theFile);
+        String thePassphrase;
+        byte[] byteArray = theFileContent.getBytes();
+        System.out.println("Please enter a passphrase: ");
+        thePassphrase = userIn.nextLine();
+        prevEncrypt = encrypt(byteArray, thePassphrase);
+        System.out.println(bytesToHexString(prevEncrypt));
+    }
+
+    /**
+     * Driver method for the decryption service.
+     * Prints out a decrypted version for the given symmetric cryptogram under a given passphrase.
+     */
+    private static void decryptService(String input) {
+        Scanner userIn = new Scanner(System.in);
+        String thePassphrase;
+        byte[] decryptedByteArray;
+        System.out.println("Please enter a passphrase: ");
+        thePassphrase = userIn.nextLine();
+        if (input.equals("prev encrypt")) { //input from file
+            decryptedByteArray = decrypt(prevEncrypt, thePassphrase);
+            System.out.println(bytesToHexString(decryptedByteArray));
+        } else if (input.equals("user input")) { //input from command line
+
+
+        }
+
+    }
+
+//    private static byte[] hashByteArray(byte[] m) { return KMACXOF256("".getBytes(), m, 512, "D".getBytes()); }
+//
+//    private static byte[] authenticationTag(byte[] m, String pw) { return KMACXOF256(pw.getBytes(), m, 512, "T".getBytes()); }
+
+    /**
+     * Helper method that contains the logical work of the encryption service.
+     * @param m the byte array to be encrypted.
+     * @param pw the passphrase given by the user.
+     * @return an encrypted version of the given byte array.
+     */
+    private static byte[] encrypt(byte[] m, String pw) {
+        byte[] rand = new byte[64];
+        z.nextBytes(rand);
+        byte[] keka = KMACXOF256(concat(rand, pw.getBytes()), "".getBytes(), 1024, "S".getBytes());
+        byte[] ke = new byte[64];
+        System.arraycopy(keka,0,ke,0,64);
+        byte[] ka = new byte[64];
+        System.arraycopy(keka, 64,ka,0,64);
+        
+        byte[] c = KMACXOF256(ke, "".getBytes(), (m.length * 8), "SKE".getBytes());
+        c =  xorBytes(c, m);
+        byte[] t = KMACXOF256(ka, m, 512, "SKA".getBytes());
+
+        System.out.println("tag in encrypt: \n" + bytesToHexString(t));
+
+        return concat(concat(rand, c), t);
+    }
+
+    /**
+     * Helper method that contains the logical work of the decryption service.
+     * @param cryptogram the symmetric cryptogram to be decrypted.
+     * @param pw the passphrase given by the user.
+     * @return a decrypted version of the given cryptogram.
+     */
+    private static byte[] decrypt(byte[] cryptogram, String pw) {
+        byte[] rand = new byte[64];
+        System.arraycopy(cryptogram, 0, rand, 0, 64);
+
+        byte[] c = new byte[cryptogram.length - 128];
+        System.arraycopy(cryptogram, 64, c, 0, cryptogram.length - 128);
+
+        System.out.println("This should match t from encrypt: \n" + bytesToHexString(c));
+
+        byte[] keka = KMACXOF256(concat(rand, pw.getBytes()), "".getBytes(), 1024, "S".getBytes());
+        byte[] ke = new byte[64];
+        System.arraycopy(keka,0,ke,0,64);
+        byte[] ka = new byte[64];
+        System.arraycopy(keka, 64,ka,0,64);
+
+        byte[] m = KMACXOF256(ke, "".getBytes(), (c.length * 8), "SKE".getBytes());
+        m = xorBytes(m, c);
+
+        byte[] tPrime = KMACXOF256(ka, m, 512, "SKA".getBytes());
+        return concat(concat(c, tPrime), m);
+    }
+
+    /**************************************************************
+     *                        User Input                          *
+     **************************************************************/
 
     /**
      * Checks whether the user inputted integer is within the desired range.
@@ -612,18 +814,45 @@ public class Main {
     }
 
     /**
-     * Asks the user if they would like to repeat the program.
-     * Accepted responses:
-     *  Y or Yes (ignoring case)
-     *  N or No (ignoring case)
-     * @param userIn The scanner that will be used.
-     * @return Returns true if the user would like to repeat, false if the user would like to quit.
+     * Asks the user for a file path.
+     * If correctly verified, the method will create a File object from that path.
+     * @param userIn the scanner used when asking the user for the file path.
+     * @return the File object created from the verified path.
      */
-    private static boolean repeat(final Scanner userIn) {
-        System.out.println("\nWould you like to use another service? (Y/N)");
-        String s = userIn.next();
-        System.out.println();
-        return (s.equalsIgnoreCase("Y") || s.equalsIgnoreCase ("yes"));
+    public static File getUserInputFile(final Scanner userIn) {
+        File theFile;
+        boolean pathVerify = false;
+        String filePrompt = "Please enter the full path of the file:";
+        do {
+            System.out.println(filePrompt);
+            theFile = new File(userIn.nextLine());
+            if (theFile.exists()) {
+                pathVerify = true;
+            } else {
+                System.out.println("ERROR: File doesn't exist.");
+            }
+        } while (!pathVerify);
+
+        return theFile;
+    }
+
+    /*************************************************************
+     *                          Helpers                          *
+     *************************************************************/
+
+    /**
+     * Converts the content of a file to String format.
+     * @param theFile the File object to be converted.
+     * @return the converted String object.
+     */
+    public static String fileToString(final File theFile) {
+        String theString = null;
+        try {
+            theString = new String(Files.readAllBytes(theFile.getAbsoluteFile().toPath()));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return theString;
     }
 
 }
