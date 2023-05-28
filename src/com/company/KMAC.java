@@ -60,12 +60,6 @@ public class KMAC {
         for (int i = 12 + 2*l - rounds; i < 12 + 2*l; i++) {
             stateOut = iota(chi(rhoPhi(theta(stateOut))), i); // sec 3.3 FIPS 202
         }
-
-        //System.out.println("stateout in keccakp: " + Arrays.toString(stateOut));
-
-        //System.out.println("stateout in bytearray: \n" + Arrays.toString(stateToByteArray(stateOut, rounds)));
-
-
         return stateOut;
     }
 
@@ -155,10 +149,8 @@ public class KMAC {
      * @return a byte array of bitLen bits produced by the keccakp permutations over the input
      */
     private static byte[] sponge(byte[] in, int bitLen, int cap) {
-        //System.out.println("data in to sponge: \n" + bytesToHexString(in));
         int rate = 1600 - cap;
         byte[] padded = in.length % (rate / 8) == 0 ? in : padTenOne(rate, in); // one bit of padding already appended
-        //System.out.println("data in sponge padded: \n" + bytesToHexString( padded));
         long[][] states = byteArrayToStates(padded, cap);
         long[] stcml = new long[25];
         for (long[] st : states) {
@@ -174,8 +166,6 @@ public class KMAC {
             stcml = keccak(stcml, 1600, 24);
         } while (out.length * 64 < bitLen);
 
-
-        //System.out.println("data out of sponge: \n" + bytesToHexString( stateToByteArray(out, bitLen)));
         return stateToByteArray(out, bitLen);
     }
 
@@ -226,22 +216,11 @@ public class KMAC {
      * @return the message digest based on Keccak[512]
      */
     public static byte[] cSHAKE256(byte[] in, int bitLength, byte[] functionName, byte[] customStr) {
-//        System.out.println("Encoded n: \n" + bytesToHexString(encodeString(functionName)));
-//        System.out.println("Encoded s: \n" + bytesToHexString(encodeString(customStr)));
-//        System.out.println("Byte[] into cSHAKE256: \n" + bytesToHexString(in));
-//        System.out.println("Bitlength into cSHAKE256: " + bitLength);
-//        System.out.println("functionName into cSHAKE256: \n" + bytesToHexString(functionName));
-//        System.out.println("customString into cSHAKE256: \n" + bytesToHexString(customStr));
         if (functionName.length == 0 && customStr.length == 0) return SHAKE256(in, bitLength);
 
         byte[] fin = concat(encodeString(functionName), encodeString(customStr));
-//        System.out.println("Concatenation of encoded functionName and encoded customStr:\n" + bytesToHexString(fin));
-//        System.out.println("bytePad of previous bytes with 136:\n" + bytesToHexString(bytePad(fin,136)));
         fin = concat(bytePad(fin, 136), in);
-//        System.out.println("Concatenation of bytePad and in:\n" + bytesToHexString(fin));
         fin = concat(fin, new byte[] {0x04});
-
-//        System.out.println("Bytes before sponge: \n" + bytesToHexString(fin));
 
         return sponge(fin, bitLength, 512);
     }
@@ -285,7 +264,6 @@ public class KMAC {
         while (x.compareTo(new BigInteger(String.valueOf((int)Math.pow(2, (8*n))))) != -1) {
             n++;
         }
-        //System.out.println("value of n in right encode: " + n);
         // 2. Let x1, x2, ..., xn be the base-256 encoding of x. That is to say that the byte
         // representation of x
         byte[] xBytes = x.toByteArray();
@@ -304,7 +282,6 @@ public class KMAC {
         }
         // 4. let xBytes.length + 1 = enc8(n). That is appended the reversed byte representation
         // of n to the end of xBytes.
-        //output[output.length-1] = reverseBitsByte((byte)n);
         output[0] =(byte)n;
         return output;
     }
@@ -397,8 +374,6 @@ public class KMAC {
         for (int i = wEncode.length + X.length; i < z.length; i++) {
             z[i] = (byte) 0;
         }
-
-//        System.out.println("bytePad returned at end of bytePad function:\n" + bytesToHexString(z));
 
         // 4. return z
         return z;
@@ -548,14 +523,9 @@ public class KMAC {
                 hex.append(" ");
                 space = 0;
             }
-//            if(newline == 16) {
-//                hex.append("\n");
-//                newline = 0;
-//            }
 
             hex.append(String.format("%02X", b[i]));
             space++;
-//            newline++;
         }
         return hex.toString();
     }
@@ -576,9 +546,5 @@ public class KMAC {
         }
         return val;
     }
-
-//    public static String hextStringToASCII(String s) {
-//        StringBuilder output = new StringBuilder("");
-//    }
 
 }

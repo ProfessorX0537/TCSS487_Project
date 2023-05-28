@@ -47,13 +47,6 @@ public class Main {
         String n = "";
         String s = "Email Signature";
 
-
-
-        //cSHAKE256(hexStringToBytes(data), 512, n.getBytes(), s.getBytes());
-        //KMACXOF256("".getBytes(), hexStringToBytes(data), 512, "D".getBytes());
-//        System.out.println("Cryptographic hash of byte array passed in:\n" + bytesToHexString(hashByteArray(hexStringToBytes(data))));
-//        System.out.println("Authentication tag t of byte[] m under passphrase:\n" + bytesToHexString(KMACXOF256("Passsword1234!".getBytes(), hexStringToBytes(data), 512, "T".getBytes())));
-
     }
 
     /*************************************************************
@@ -220,10 +213,6 @@ public class Main {
         System.out.println("\nDecryption in String format:\n" + new String (decryptedByteArray, StandardCharsets.UTF_8));
     }
 
-//    private static byte[] hashByteArray(byte[] m) { return KMACXOF256("".getBytes(), m, 512, "D".getBytes()); }
-//
-//    private static byte[] authenticationTag(byte[] m, String pw) { return KMACXOF256(pw.getBytes(), m, 512, "T".getBytes()); }
-
     /**
      * Helper method that contains the logical work of the encryption service.
      * @param m the byte array to be encrypted.
@@ -231,7 +220,6 @@ public class Main {
      * @return an encrypted version of the given byte array.
      */
     private static byte[] encrypt(byte[] m, String pw) {
-        //System.out.println("Data passed into the encryption:\n" + bytesToHexString(m));
         byte[] rand = new byte[64];
         z.nextBytes(rand);
 
@@ -277,8 +265,6 @@ public class Main {
         m = xorBytes(m, in);
 
         byte[] tPrime = KMACXOF256(ka, m, 512, "SKA".getBytes());
-        //System.out.println("This should be t from encrypt: \n" + bytesToHexString(tag));
-        //System.out.println("This should match t from encrypt: \n" + bytesToHexString(tPrime));
 
         if (Arrays.equals(tag, tPrime)) {
             return m;
