@@ -1,13 +1,22 @@
 package com.company;
 
 import java.math.BigInteger;
+import java.util.Arrays;
+import java.nio.ByteBuffer;
 
 public class ECArithmetic {
+
+    private static BigInteger b = new BigInteger("409366642661545609548304506451761004424499037950672891330661617237156207698394905026410173085555315488943712774203132690300784549962144");
 
     public static void main(String[] args) {
         Point P1 = new Point(BigInteger.valueOf(2), BigInteger.valueOf(4));
         Point P2 = new Point(BigInteger.valueOf(4), BigInteger.valueOf(8));
         Point P3 = add(P1, P2);
+        String s = "409366642661545609548304506451761004424499037950672891330661617237156207698394905026410173085555315488943712774203132690300784549962144";
+        System.out.println(s.length());
+        System.out.println(b.toByteArray().length);
+        System.out.println(Arrays.toString(b.toByteArray()));
+        System.out.println(Arrays.toString(toByteArray(b)));
     }
 
     //Constructor for the neutral element
@@ -92,6 +101,29 @@ public class ECArithmetic {
             }
         }
         return V;
+    }
+
+    //need to convert cords into little endian string of 57 octets with most significant octet is always zero
+
+    /**
+     * reverses the order of a byte[] ie convert into little endian
+     * https://stackoverflow.com/questions/12893758/how-to-reverse-the-byte-array-in-java
+     * @param b
+     * @return
+     */
+    public static byte[] toByteArray(BigInteger b) {
+        byte[] s = b.toByteArray();
+        int i = 0;
+        int j = s.length -1;
+        byte temp;
+        while (j > i) {
+            temp = s[j];
+            s[j] = s[i];
+            s[i] = temp;
+            j--;
+            i++;
+        }
+        return s;
     }
 
     /**
