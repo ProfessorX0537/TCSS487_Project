@@ -5,18 +5,20 @@ import java.util.Arrays;
 import java.nio.ByteBuffer;
 
 public class ECArithmetic {
+    private static final BigInteger p = new BigInteger("726838724295606890549323807888004534353641360687318060281490199180612328166730772686396383698676545930088884461843637361053498018365439");
 
-    private static BigInteger b = new BigInteger("409366642661545609548304506451761004424499037950672891330661617237156207698394905026410173085555315488943712774203132690300784549962144");
+    private static BigInteger b = new BigInteger("563400200929088152613609629378641385410102682117258566404750214022059686929583319585040850282322731241505930835997382613319689400286258");
 
     public static void main(String[] args) {
-        Point P1 = new Point(BigInteger.valueOf(2), BigInteger.valueOf(4));
+        Point P1 = new Point(new BigInteger("8"),new BigInteger("563400200929088152613609629378641385410102682117258566404750214022059686929583319585040850282322731241505930835997382613319689400286258"));
         Point P2 = new Point(BigInteger.valueOf(4), BigInteger.valueOf(8));
         Point P3 = add(P1, P2);
-        String s = "409366642661545609548304506451761004424499037950672891330661617237156207698394905026410173085555315488943712774203132690300784549962144";
-        System.out.println(s.length());
-        System.out.println(b.toByteArray().length);
-        System.out.println(Arrays.toString(b.toByteArray()));
-        System.out.println(Arrays.toString(toByteArray(b)));
+        byte c = 50; //least significant byte of y
+        System.out.println("Length of Y " + b.toByteArray().length);
+        System.out.println("Raw Y " + Arrays.toString(b.toByteArray()));
+        System.out.println("Y decoded from Px " + Arrays.toString(toByteArray(decode(new BigInteger("8"), c))));
+        System.out.println("P1 encoded " + Arrays.toString(encode(P1)));
+        System.out.println("P: " + p);
     }
 
     //Constructor for the neutral element
@@ -30,8 +32,7 @@ public class ECArithmetic {
     }
 
     //constructor for a curve point from its x cords and the least significant bit of y
-    public ECArithmetic(BigInteger x) {
-
+    public ECArithmetic(BigInteger x, byte leastY) {
     }
 
     // method to compare points for equality
@@ -53,14 +54,34 @@ public class ECArithmetic {
         BigInteger PX3 = (((P1.getPx().multiply(P2.getPy())).add(P1.getPy().multiply(P2.getPx()))));
         BigInteger PY3 = (((P1.getPy().multiply(P2.getPy())).subtract(P1.getPx().multiply(P2.getPx()))));
         BigInteger PY3Bottom = one.subtract(d.multiply(P1.getPx().multiply(P2.getPx()).multiply(P1.getPy()).multiply(P2.getPy())));
-        System.out.println("PX3 " + PX3);
-        System.out.println("PY3 " + PY3);
-        System.out.println("PX3 Bottom " + PX3Bottom);
-        System.out.println("PY3 Bottom " + PY3Bottom);
+//        System.out.println("PX3 " + PX3);
+//        System.out.println("PY3 " + PY3);
+//        System.out.println("PX3 Bottom " + PX3Bottom);
+//        System.out.println("PY3 Bottom " + PY3Bottom);
         Point summedPoint = new Point(PX3.divide(PX3Bottom), PY3.divide(PY3Bottom));
-        System.out.println("New x: " + summedPoint.getPx());
-        System.out.println("New y: " + summedPoint.getPy());
+//        System.out.println("New x: " + summedPoint.getPx());
+//        System.out.println("New y: " + summedPoint.getPy());
         return summedPoint;
+    }
+
+    public static byte[] encode(Point P) {
+        byte[] encoded = toByteArray(P.getPy());
+        byte[] x = toByteArray(P.getPx());
+        encoded[encoded.length -1] = x[0];
+        return encoded;
+    }
+
+    /**
+     * takes Px and decodes Py
+     * @param x
+     * @param leastY
+     * @return
+     */
+    public static BigInteger decode(BigInteger x, byte leastY) {
+        //what to do with least significant byte of y?
+        BigInteger inverse = (BigInteger.ONE.add(new BigInteger("39081").multiply(x.pow(2)))).modInverse(p);
+        BigInteger radicand = (BigInteger.ONE.subtract(x.pow(2))).multiply(inverse);
+        return computeSqrt(radicand, p, false);
     }
 
     //method that can perform scalar multiplication
@@ -80,7 +101,7 @@ public class ECArithmetic {
      * @return a square root r of v mod p with r mod 2 = 1 iff lsb = true
      * if such a root exists, otherwise null.
      */
-    public static BigInteger sqrt(BigInteger v, BigInteger p, boolean lsb) {
+    public static BigInteger computeSqrt(BigInteger v, BigInteger p, boolean lsb) {
         assert (p.testBit(0) && p.testBit(1)); // p = 3 (mod 4)
         if (v.signum() == 0) {
             return BigInteger.ZERO;
