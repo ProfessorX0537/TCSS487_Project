@@ -2,37 +2,58 @@ package com.company;
 
 import java.math.BigInteger;
 import java.util.Arrays;
-import java.nio.ByteBuffer;
 
 public class ECArithmetic {
     private static final BigInteger p = new BigInteger("726838724295606890549323807888004534353641360687318060281490199180612328166730772686396383698676545930088884461843637361053498018365439");
+    private static final BigInteger r = new BigInteger("181709681073901722637330951972001133588410340171829515070372549795146003961539585716195755291692375963310293709091662304773755859649779");
 
-    private static BigInteger b = new BigInteger("563400200929088152613609629378641385410102682117258566404750214022059686929583319585040850282322731241505930835997382613319689400286258");
+    private static BigInteger b = new BigInteger("8");
+    private static BigInteger c = new BigInteger("563400200929088152613609629378641385410102682117258566404750214022059686929583319585040850282322731241505930835997382613319689400286258");
 
     public static void main(String[] args) {
-        Point P1 = new Point(new BigInteger("8"),new BigInteger("563400200929088152613609629378641385410102682117258566404750214022059686929583319585040850282322731241505930835997382613319689400286258"));
+        Point G = new Point(b,c);
         Point P2 = new Point(BigInteger.valueOf(4), BigInteger.valueOf(8));
-        Point P3 = add(P1, P2);
-        byte c = 50; //least significant byte of y
-        System.out.println("Length of Y " + b.toByteArray().length);
-        System.out.println("Raw Y " + Arrays.toString(b.toByteArray()));
-        System.out.println("Y decoded from Px " + Arrays.toString(toByteArray(decode(new BigInteger("8"), c))));
-        System.out.println("P1 encoded " + Arrays.toString(encode(P1)));
+        Point scaled = exponentiation(G, new BigInteger("4"));
+     //   Point added = add(G, G);
+        System.out.println("Scaled point X: " + scaled.getPx() + "\nScaled point Y: " + scaled.getPy());
+
+        System.out.println("Length of Y " + c.toByteArray().length);
+        System.out.println("Raw Y " + Arrays.toString(c.toByteArray()));
+        System.out.println("BigInteger " + c);
+        System.out.println("Y decoded from Px " + Arrays.toString(toByteArrayLittleEndian(decode(b, false).getPy())));
+        System.out.println("BigInteger " + decode(b, false).getPy());
+        System.out.println("P1 encoded " + Arrays.toString(encode(G).toByteArray()));
+        System.out.println("BigInteger " + encode(G));
         System.out.println("P: " + p);
     }
 
-    //Constructor for the neutral element
-    public ECArithmetic() {
-
+    /**
+     * Takes a point and encodes per specification. Y in little-endian with most significant octet as zero.
+     * Then place the least significant byte from X into most significant byte of Y.
+     * @param P The given point on ed448 curve
+     * @return BigInteger representation of encoded point
+     */
+    public static BigInteger encode(Point P) {
+        byte[] encoded = toByteArrayLittleEndian(P.getPy());
+        byte[] x = toByteArrayLittleEndian(P.getPx());
+        encoded[encoded.length -1] = x[0];
+        return new BigInteger(encoded);
     }
 
-    //a constructor for a curve point given its x and y cords
-    public ECArithmetic(BigInteger x, BigInteger y) {
 
-    }
+    /**
+     * Given BigInteger x from a point (x,y) and the least significant bit of y. Decode the
+     * BigInteger y.
+     * @param x coordinate of a point on ed448
+     * @param lsb desired least significant bit (true: 1, false: 0).
+     * @return the decoded point
+     */
+    public static Point decode(BigInteger x, boolean lsb) {
+        //TODO not checking actual bit may cause a problem
+        BigInteger inverse = (BigInteger.ONE.add(new BigInteger("39081").multiply(x.pow(2)))).modInverse(p);
+        BigInteger radicand = (BigInteger.ONE.subtract(x.pow(2))).multiply(inverse);
 
-    //constructor for a curve point from its x cords and the least significant bit of y
-    public ECArithmetic(BigInteger x, byte leastY) {
+        return new Point(x,computeSqrt(radicand, p, lsb));
     }
 
     // method to compare points for equality
@@ -44,44 +65,6 @@ public class ECArithmetic {
     public static Point opposite(Point P) {
         P.setPx(P.getPx().multiply(BigInteger.valueOf(-1)));
         return P;
-    }
-
-    // method to compute the sum of the current point and another point
-    public static Point add(Point P1, Point P2) {
-        BigInteger one = BigInteger.ONE;
-        BigInteger d = BigInteger.valueOf(-39081);
-        BigInteger PX3Bottom = one.add(d.multiply(P1.getPx()).multiply(P2.getPx()).multiply(P1.getPy().multiply(P2.getPy())));
-        BigInteger PX3 = (((P1.getPx().multiply(P2.getPy())).add(P1.getPy().multiply(P2.getPx()))));
-        BigInteger PY3 = (((P1.getPy().multiply(P2.getPy())).subtract(P1.getPx().multiply(P2.getPx()))));
-        BigInteger PY3Bottom = one.subtract(d.multiply(P1.getPx().multiply(P2.getPx()).multiply(P1.getPy()).multiply(P2.getPy())));
-//        System.out.println("PX3 " + PX3);
-//        System.out.println("PY3 " + PY3);
-//        System.out.println("PX3 Bottom " + PX3Bottom);
-//        System.out.println("PY3 Bottom " + PY3Bottom);
-        Point summedPoint = new Point(PX3.divide(PX3Bottom), PY3.divide(PY3Bottom));
-//        System.out.println("New x: " + summedPoint.getPx());
-//        System.out.println("New y: " + summedPoint.getPy());
-        return summedPoint;
-    }
-
-    public static byte[] encode(Point P) {
-        byte[] encoded = toByteArray(P.getPy());
-        byte[] x = toByteArray(P.getPx());
-        encoded[encoded.length -1] = x[0];
-        return encoded;
-    }
-
-    /**
-     * takes Px and decodes Py
-     * @param x
-     * @param leastY
-     * @return
-     */
-    public static BigInteger decode(BigInteger x, byte leastY) {
-        //what to do with least significant byte of y?
-        BigInteger inverse = (BigInteger.ONE.add(new BigInteger("39081").multiply(x.pow(2)))).modInverse(p);
-        BigInteger radicand = (BigInteger.ONE.subtract(x.pow(2))).multiply(inverse);
-        return computeSqrt(radicand, p, false);
     }
 
     //method that can perform scalar multiplication
@@ -113,18 +96,49 @@ public class ECArithmetic {
         return (r.multiply(r).subtract(v).mod(p).signum() == 0) ? r : null;
     }
 
+    /**
+     * Performs scalar multiplication
+     * @param P The point to be scaled
+     * @param s The scalar
+     * @return Scaled point
+     */
     public static Point exponentiation(Point P, BigInteger s) {
-        Point V = P;
-        for (BigInteger i = s.subtract(BigInteger.ONE); i.compareTo(BigInteger.ZERO) > -1; i = i.subtract(BigInteger.ONE)) {
-            V = add(V, V);
-            if (s.testBit(i.intValue())) {
-                V = add(V, P);
+        String bin = s.toString(2);
+        if(s.equals(BigInteger.ZERO)) {
+            return new Point(BigInteger.ZERO, BigInteger.ONE);
+        } else if(bin.length() == 1) {
+            return P;
+        } else {
+            Point G = P;
+            for (int i = 1 ; i < bin.length(); i++) {
+                G = add(G, G);
+                if (bin.charAt(i) == '1') {
+                    G = add(G, P);
+                }
             }
+            return G;
         }
-        return V;
     }
 
-    //need to convert cords into little endian string of 57 octets with most significant octet is always zero
+
+    /**
+     * Performs Edwards addition on 2 points
+     * @param P1
+     * @param P2
+     * @return a point that is the sum of two given points
+     */
+    public static Point add(Point P1, Point P2) {
+        BigInteger one = BigInteger.ONE;
+        BigInteger d = BigInteger.valueOf(-39081);
+
+        BigInteger PX3Bottom = one.add(d.multiply(P1.getPx()).multiply(P2.getPx()).multiply(P1.getPy()).multiply(P2.getPy()));
+        BigInteger PX3Top = (((P1.getPx().multiply(P2.getPy())).add(P1.getPy().multiply(P2.getPx()))));
+        BigInteger PY3Top = (((P1.getPy().multiply(P2.getPy())).subtract(P1.getPx().multiply(P2.getPx()))));
+        BigInteger PY3Bottom = one.subtract(d.multiply(P1.getPx().multiply(P2.getPx()).multiply(P1.getPy()).multiply(P2.getPy())));
+
+        //don't do normal division in different modulus
+        return new Point(PX3Top.multiply(PX3Bottom.modInverse(p)).mod(p), PY3Top.multiply(PY3Bottom.modInverse(p)).mod(p));
+    }
 
     /**
      * reverses the order of a byte[] ie convert into little endian
@@ -132,7 +146,7 @@ public class ECArithmetic {
      * @param b
      * @return
      */
-    public static byte[] toByteArray(BigInteger b) {
+    public static byte[] toByteArrayLittleEndian(BigInteger b) {
         byte[] s = b.toByteArray();
         int i = 0;
         int j = s.length -1;
@@ -147,33 +161,33 @@ public class ECArithmetic {
         return s;
     }
 
-    /**
-     * Inner class to hold values of points
-     * @author Xavier Hines
-     */
-    private static class Point {
-        private BigInteger Px;
-        private BigInteger Py;
-
-        public Point(BigInteger Px, BigInteger Py) {
-            this.Px = Px;
-            this.Py = Py;
-        }
-
-        public BigInteger getPx() { return Px; }
-
-        public BigInteger getPy() { return Py; }
-
-        public void setPx(BigInteger thePx) { this.Px = thePx; }
-
-        public void setPy(BigInteger thePy) { this.Py = thePy; }
-
-        @Override
-        public String toString() {
-            String s = "";
-            s = s + "X: " +Px.toString() + " Y:"+ Py.toString();
-            return s;
-        }
+    /************************************************************
+     *                        Generators                        *
+     ************************************************************/
+    //Constructor for the neutral element
+    public static Point neutralElement() {
+        return new Point(BigInteger.ZERO, BigInteger.ONE);
     }
 
+    //a constructor for a curve point given its x and y cords
+    public static Point curve(BigInteger x, BigInteger y) {
+        return new Point(x, y);
+    }
+
+    //constructor for a curve point from its x cords and the least significant bit of y
+    public static Point curveLeastSig(BigInteger x) {
+        return decode(x, false);
+    }
+
+    /************************************************************
+     *                         Getters                          *
+     ************************************************************/
+
+    public static BigInteger getR() {
+        return r;
+    }
+
+    public static  BigInteger getP() {
+        return p;
+    }
 }

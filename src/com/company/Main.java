@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.Scanner;
 
 import static com.company.KMAC.*;
+import static com.company.ECArithmetic.*;
 
 /**
  * Main class of NIST compliant implementation of KMACX0F256
@@ -26,6 +27,8 @@ public class Main {
      * secure random field variable
      */
     private static SecureRandom z = new SecureRandom();
+
+    private static Point G = new Point(new BigInteger("8"), new BigInteger("563400200929088152613609629378641385410102682117258566404750214022059686929583319585040850282322731241505930835997382613319689400286258"));
 
     private static byte[] prevEncrypt;
 
