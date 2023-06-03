@@ -114,7 +114,7 @@ public class Main {
                     5) Verify a given data file and its signature file under a given public
                        key file
                 """;
-        int response = getIntInRange(userIn, menuPrompt, 1, 4);
+        int response = getIntInRange(userIn, menuPrompt, 1, 5);
         if (response == 1) {
             System.out.println("In 1");
             keyPairEC();
@@ -355,10 +355,19 @@ public class Main {
         byte[] s = KMACXOF256(thePassphrase.getBytes(), "".getBytes(), 512, "SK".getBytes());
         Point V = exponentiation(G, new BigInteger(s));
 
-        //Write public key to file
-        writeToOutputFile(publicKeyOutputFile, V.getPx() + ":" + V.getPy());
-        //Write private key to file
-        writeToOutputFile(privateKeyOutputFile, bytesToHexString(s));
+        try {
+            FileWriter publicFw = new FileWriter(publicKeyOutputFile);
+            publicFw.write((bytesToHexString(V.getPx().toByteArray())) + "\n");
+            publicFw.write((bytesToHexString(V.getPy().toByteArray())) + "\n");
+            publicFw.close();
+
+            FileWriter privateFw = new FileWriter(privateKeyOutputFile);
+            privateFw.write(bytesToHexString(s));
+            privateFw.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
     }
 
     private static void encryptEC() {
@@ -366,21 +375,19 @@ public class Main {
         Scanner userIn = new Scanner(System.in);
         File inputFile;
         File encryptOutputFile = new File("CiphertextOutput.txt");
-        String input;
+        String input = null;
 
         //get input
-        switch (fileOrInputPrompt(userIn)) {
-            case "file":
-                System.out.println("Chosen File :]");
-                inputFile = getUserInputFile(userIn);
-                input = fileToString(inputFile);
-            case "user input":
-                System.out.println("Chosen user input :]");
-                System.out.println("Please input a message you would like to be encrypted:");
-                input = userIn.nextLine();
-                break;
-            default:
-                throw new IllegalStateException("Unexpected value: " + fileOrInputPrompt(userIn));
+        String s = fileOrInputPrompt(userIn);
+        if ("file".equals(s)) {
+            System.out.println("Chosen File :]");
+            Scanner fileInputScan = new Scanner(System.in);
+            inputFile = getUserInputFile(fileInputScan);
+            input = fileToString(inputFile);
+        } else if ("user input".equals(s)) {
+            System.out.println("Chosen user input :]");
+            System.out.println("Please input a message you would like to be encrypted:");
+            input = userIn.nextLine();
         }
 
         //encrypt input data (Stored in "input" string)
@@ -389,12 +396,8 @@ public class Main {
         byte[] k = new byte[64];
         z.nextBytes(k);
 
-        String VString = fileToString(new File("publicKeyOutputFile.txt"));
-
-        Scanner stringScanner = new Scanner(VString);
-        String str = stringScanner.next();
-        String[] strarr = str.split(":");
-        Point V = new Point(new BigInteger(strarr[0]), new BigInteger(strarr[0]));
+        Scanner stringScanner = new Scanner(input);
+        Point V = new Point(new BigInteger(hexStringToBytes(stringScanner.nextLine())), new BigInteger(hexStringToBytes(stringScanner.nextLine())));
 
         Point W = exponentiation(V, new BigInteger(k));
         Point Z = exponentiation(G, new BigInteger(k));
@@ -411,15 +414,23 @@ public class Main {
         byte[] t = KMACXOF256(ka, m, 512, "PKA".getBytes());
 
         //write the cipertext to the output file
-        writeToOutputFile(encryptOutputFile, "" +bytesToHexString(Z.getPx().toByteArray())  + ":"
-                +bytesToHexString(Z.getPy().toByteArray())  + ":"
-                + bytesToHexString(c) + ":" + bytesToHexString(t));
+        try {
+            FileWriter cipherTextFw = new FileWriter(encryptOutputFile);
+            cipherTextFw.write(bytesToHexString(Z.getPx().toByteArray()) + "\n");
+            cipherTextFw.write(bytesToHexString(Z.getPy().toByteArray()) + "\n");
+            cipherTextFw.write(bytesToHexString(c) + "\n");
+            cipherTextFw.write(bytesToHexString(t) + "\n");
+            cipherTextFw.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
     }
 
     private static void decryptEC() {
         System.out.println("MM decrypt :P");
         Scanner userIn = new Scanner(System.in);
+        Scanner fileIn = new Scanner(System.in);
         File inputFile;
         File outputFile = new File("DecryptedEC.txt");
         String thePassphrase;
@@ -427,7 +438,7 @@ public class Main {
         String decryptedData;
 
         //get file
-        inputFile = new File("CiphertextOutput.txt");
+        inputFile = getUserInputFile(fileIn);
 
         //get passphrase
         System.out.println("Please enter a passphrase used to encrypt: ");
@@ -435,13 +446,10 @@ public class Main {
 
         //get file contents
         inputFileContents = fileToString(inputFile);
-        String encryptedString = fileToString(new File("CiphertextOutput.txt"));
-        Scanner stringScanner = new Scanner(encryptedString);
-        String str = stringScanner.nextLine();
-        String[] strarr = str.split(":");
-        Point Z = new Point(new BigInteger(hexStringToBytes(strarr[0])), new BigInteger(hexStringToBytes(strarr[1])));
-        byte[] c = hexStringToBytes(strarr[2]);
-        byte[] t = hexStringToBytes(strarr[3]);
+        Scanner stringScanner = new Scanner(inputFileContents);
+        Point Z = new Point(new BigInteger(hexStringToBytes(stringScanner.nextLine())), new BigInteger(hexStringToBytes(stringScanner.nextLine())));
+        byte[] c = hexStringToBytes(stringScanner.nextLine());
+        byte[] t = hexStringToBytes(stringScanner.nextLine());
 
         //decrypt file contents
 
@@ -468,8 +476,6 @@ public class Main {
             throw new IllegalArgumentException("Tags didn't match");
         }
 
-        //output decrypted contents
-//        writeToOutputFile(outputFile, DECRYPTED DATA STRING GOES HERE);
     }
 
     private static void signFileEC() {
@@ -480,22 +486,23 @@ public class Main {
         String inputData;
 
         //get input
-        switch (fileOrInputPrompt(userIn)) {
-            case "file":
-                System.out.println("Chosen File :]");
-                inputFile = getUserInputFile(userIn);
-                inputData = fileToString(inputFile);
-            case "user input":
-                System.out.println("Chosen user input :]");
-                System.out.println("Please input a message you would like to be encrypted:");
-                inputData = userIn.nextLine();
-                break;
-            default:
-                throw new IllegalStateException("Unexpected value: " + fileOrInputPrompt(userIn));
+        String fileOrInputPrompt = fileOrInputPrompt(userIn);
+        if ("file".equals(fileOrInputPrompt)) {
+            System.out.println("Chosen File :]");
+            Scanner fileIn = new Scanner(System.in);
+            inputFile = getUserInputFile(fileIn);
+            inputData = fileToString(inputFile);
+        } else if ("user input".equals(fileOrInputPrompt)) {
+            System.out.println("Chosen user input :]");
+            System.out.println("Please input a message you would like to be encrypted:");
+            inputData = userIn.nextLine();
+        } else {
+            throw new IllegalStateException("Unexpected value: " + fileOrInputPrompt(userIn));
         }
 
+        Scanner pwScanner = new Scanner(System.in);
         System.out.println("Please enter a passphrase used to encrypt: ");
-        String thePassphrase = userIn.nextLine();
+        String thePassphrase = pwScanner.nextLine();
 
         //sign input
         //make sure it is a multiple of 4?
@@ -507,9 +514,15 @@ public class Main {
         byte[] h = KMACXOF256(U.getPx().toByteArray(), inputData.getBytes() ,512, "T".getBytes());
         byte[] z = (new BigInteger(k).subtract(new BigInteger(h).multiply(new BigInteger(s)))).mod(getR()).toByteArray();
 
-
         //write signed input to file
-        writeToOutputFile(signedFile, "" + bytesToHexString(h) + ":" + bytesToHexString(z));
+        try {
+            FileWriter signedFw = new FileWriter(signedFile);
+            signedFw.write(bytesToHexString(h) + "\n");
+            signedFw.write(bytesToHexString(z) + "\n");
+            signedFw.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
     }
 
@@ -527,36 +540,38 @@ public class Main {
         dataFile = getUserInputFile(userIn);
 
         System.out.println("SIGNATURE FILE");
-//        signatureFile = getUserInputFile(userIn);
-        signatureFile = new File("SignedInputSignature.txt");
+        signatureFile = getUserInputFile(userIn);
         Scanner signedFileReader = null;
         try {
             signedFileReader = new Scanner(signatureFile);
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
+
         assert signedFileReader != null;
-        String str = signedFileReader.nextLine();
-        String[] strarr = str.split(":");
-        String hexStringH = strarr[0];
+        String hexStringH = signedFileReader.nextLine();
         byte[] h = hexStringToBytes(hexStringH);
-        String hexStringZ = strarr[1];
+        String hexStringZ = signedFileReader.nextLine();
         byte[] z = hexStringToBytes(hexStringZ);
 
         System.out.println("PUBLIC KEY FILE");
-        String VString = fileToString(new File("publicKeyOutputFile.txt"));
-        Scanner stringScanner = new Scanner(VString);
-        String str2 = stringScanner.nextLine();
-        String[] strarr2 = str2.split(":");
-        Point V = new Point(new BigInteger(strarr2[0]), new BigInteger(strarr2[1]));
+        publicKeyFile = getUserInputFile(userIn);
+        Scanner stringScanner = null;
+        try {
+            stringScanner = new Scanner(publicKeyFile);
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+        assert stringScanner != null;
+        Point V = new Point(new BigInteger(hexStringToBytes(stringScanner.nextLine())), new BigInteger(hexStringToBytes(stringScanner.nextLine())));
 
         //verify
         Point U = add(exponentiation(G, new BigInteger(z)), exponentiation(V, new BigInteger(h)));
-        if (KMACXOF256(U.getPx().toByteArray(), fileToString(dataFile).getBytes(), 512, "T".getBytes()) == h) {
+        if (Arrays.toString(KMACXOF256(U.getPx().toByteArray(), fileToString(dataFile).getBytes(), 512, "T".getBytes())).equals(Arrays.toString(h))) {
             //successs
-            System.out.println("SUCCESSSSSSSSSSSSSSS VERIFICATION");
+            System.out.println("Verification Success");
         } else {
-            System.out.println("FAILUREEEEEEEEEEEEEe VERIFICATION");
+            System.out.println("Verification Failed");
         }
 
     }
